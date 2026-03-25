@@ -1,0 +1,1502 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pixel & ASCII Art Stylizer</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --bg: #0a0a10; --surface: #14141f; --surface2: #1e1e2e; --border: #2a2a40;
+    --text: #e8e8f0; --text2: #8888a0; --accent: #7c6aff; --accent2: #ff6ab0;
+    --accent-hover: #9080ff; --radius: 12px; --red: #ff4466;
+  }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background: var(--bg); color: var(--text);
+    min-height: 100vh; display: flex; flex-direction: column; align-items: center;
+  }
+  header { text-align: center; padding: 32px 20px 16px; }
+  header h1 {
+    font-size: 26px; font-weight: 700;
+    background: linear-gradient(135deg, var(--accent), var(--accent2));
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+  }
+  header p { color: var(--text2); margin-top: 6px; font-size: 13px; }
+
+  .app { width: 100%; max-width: 1200px; padding: 0 16px 40px; display: flex; flex-direction: column; gap: 16px; }
+
+  .upload-zone {
+    border: 2px dashed var(--border); border-radius: var(--radius);
+    padding: 56px 20px; text-align: center; cursor: pointer;
+    transition: border-color .2s, background .2s; background: var(--surface);
+  }
+  .upload-zone:hover, .upload-zone.drag-over { border-color: var(--accent); background: rgba(124,106,255,.05); }
+  .upload-zone.hidden { display: none; }
+  .upload-zone svg { margin-bottom: 10px; opacity: .4; }
+  .upload-zone .label { font-size: 15px; color: var(--text2); }
+  .upload-zone .label span { color: var(--accent); text-decoration: underline; }
+  .upload-zone .sub { font-size: 12px; color: var(--text2); margin-top: 8px; opacity: .6; }
+
+  .workspace { display: none; gap: 16px; }
+  .workspace.active { display: flex; }
+
+  .sidebar {
+    flex: 0 0 272px; display: flex; flex-direction: column; gap: 12px;
+    height: calc(100vh - 100px); position: sticky; top: 16px; overflow-y: auto;
+    scrollbar-width: thin; scrollbar-color: var(--border) transparent;
+  }
+  .sidebar::-webkit-scrollbar { width: 4px; }
+  .sidebar::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+  .panel {
+    background: var(--surface); border-radius: var(--radius); padding: 16px;
+    display: flex; flex-direction: column; gap: 12px;
+  }
+  .panel-title {
+    font-size: 11px; text-transform: uppercase; letter-spacing: 1.2px;
+    color: var(--text2); font-weight: 600;
+  }
+
+  .ctrl { display: flex; flex-direction: column; gap: 6px; }
+  .ctrl-label {
+    font-size: 12px; color: var(--text2);
+    display: flex; justify-content: space-between; align-items: center;
+  }
+  .ctrl-label .v { color: var(--accent); font-weight: 600; font-variant-numeric: tabular-nums; }
+
+  input[type="range"] {
+    -webkit-appearance: none; width: 100%; height: 5px;
+    border-radius: 3px; background: var(--surface2); outline: none;
+  }
+  input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none; width: 16px; height: 16px; border-radius: 50%;
+    background: var(--accent); cursor: pointer;
+    box-shadow: 0 0 0 3px rgba(124,106,255,.2);
+  }
+
+  .chip-group { display: flex; flex-wrap: wrap; gap: 4px; }
+  .chip {
+    padding: 5px 10px; border-radius: 6px; border: 1px solid var(--border);
+    background: var(--surface2); color: var(--text2); font-size: 11px;
+    cursor: pointer; transition: all .12s; white-space: nowrap;
+  }
+  .chip:hover { border-color: var(--accent); color: var(--text); }
+  .chip.active { border-color: var(--accent); background: rgba(124,106,255,.15); color: var(--accent); }
+
+  .toggle-row {
+    display: flex; align-items: center; justify-content: space-between;
+    font-size: 12px; color: var(--text2);
+  }
+  .toggle {
+    width: 40px; height: 22px; background: var(--surface2); border-radius: 11px;
+    position: relative; cursor: pointer; transition: background .2s; border: none;
+  }
+  .toggle::after {
+    content: ''; position: absolute; top: 3px; left: 3px;
+    width: 16px; height: 16px; border-radius: 50%; background: #555;
+    transition: transform .2s, background .2s;
+  }
+  .toggle.on { background: var(--accent); }
+  .toggle.on::after { transform: translateX(18px); background: #fff; }
+
+  input[type="text"].custom-input {
+    background: var(--surface2); border: 1px solid var(--border); border-radius: 6px;
+    color: var(--text); padding: 6px 10px; font-size: 12px; font-family: monospace;
+    outline: none; width: 100%;
+  }
+  input[type="text"].custom-input:focus { border-color: var(--accent); }
+  input[type="color"] {
+    width: 32px; height: 24px; border: 1px solid var(--border); border-radius: 4px;
+    background: none; cursor: pointer; padding: 0;
+  }
+
+  .btn {
+    padding: 10px 16px; border-radius: 8px; border: none; font-size: 13px;
+    font-weight: 600; cursor: pointer; transition: all .12s;
+    display: flex; align-items: center; justify-content: center; gap: 6px;
+  }
+  .btn-primary { background: var(--accent); color: #fff; }
+  .btn-primary:hover { background: var(--accent-hover); }
+  .btn-sm { background: var(--surface2); color: var(--text2); font-size: 12px; padding: 8px 12px; }
+  .btn-sm:hover { background: var(--border); color: var(--text); }
+  .btn-danger { background: var(--red); color: #fff; }
+  .btn-danger:hover { background: #ff6680; }
+  .btn-row { display: flex; gap: 6px; }
+  .btn-row .btn { flex: 1; }
+
+  .preview { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 10px; }
+  .tab-bar {
+    display: flex; gap: 3px; background: var(--surface); border-radius: 8px;
+    padding: 3px; width: fit-content;
+  }
+  .tab {
+    padding: 6px 14px; border-radius: 6px; border: none; background: none;
+    color: var(--text2); font-size: 12px; cursor: pointer; transition: all .12s;
+  }
+  .tab.active { background: var(--accent); color: #fff; }
+  .tab:hover:not(.active) { color: var(--text); }
+  .canvas-wrap {
+    background: var(--surface); border-radius: var(--radius); padding: 16px;
+    display: flex; align-items: center; justify-content: center; flex-direction: column;
+    overflow: auto; min-height: 420px; position: relative;
+  }
+  .canvas-wrap canvas { max-width: 100%; max-height: 72vh; border-radius: 4px; }
+
+  /* Video controls */
+  .video-bar {
+    display: none; width: 100%; padding: 12px 0 0;
+    flex-direction: column; gap: 8px;
+  }
+  .video-bar.active { display: flex; }
+  .video-timeline {
+    -webkit-appearance: none; width: 100%; height: 4px;
+    border-radius: 2px; background: var(--surface2); outline: none; cursor: pointer;
+  }
+  .video-timeline::-webkit-slider-thumb {
+    -webkit-appearance: none; width: 14px; height: 14px; border-radius: 50%;
+    background: var(--accent2); cursor: pointer; box-shadow: 0 0 0 2px rgba(255,106,176,.3);
+  }
+  .video-ctrl-row {
+    display: flex; align-items: center; gap: 10px; font-size: 12px; color: var(--text2);
+  }
+  .video-ctrl-row .v-btn {
+    width: 32px; height: 32px; border-radius: 50%; border: none;
+    background: var(--accent); color: #fff; cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    transition: background .12s; flex-shrink: 0;
+  }
+  .video-ctrl-row .v-btn:hover { background: var(--accent-hover); }
+  .video-ctrl-row .v-btn svg { width: 14px; height: 14px; fill: currentColor; }
+  .video-time { font-variant-numeric: tabular-nums; min-width: 90px; }
+  .video-fps { margin-left: auto; color: var(--accent); font-weight: 600; font-variant-numeric: tabular-nums; }
+  .rec-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--red); animation: pulse 1s infinite; }
+  @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: .3; } }
+
+  .info-bar { font-size: 11px; color: var(--text2); display: flex; gap: 14px; flex-wrap: wrap; }
+
+  /* Loading overlay */
+  .loading-overlay {
+    display: none; position: fixed; inset: 0; z-index: 999;
+    background: rgba(10,10,16,.85); backdrop-filter: blur(8px);
+    flex-direction: column; align-items: center; justify-content: center; gap: 16px;
+  }
+  .loading-overlay.active { display: flex; }
+  .loading-spinner {
+    width: 40px; height: 40px; border: 3px solid var(--border);
+    border-top-color: var(--accent); border-radius: 50%;
+    animation: spin .8s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .loading-text { font-size: 14px; color: var(--text); text-align: center; }
+  .loading-sub { font-size: 12px; color: var(--text2); text-align: center; }
+  .loading-progress {
+    width: 240px; height: 4px; border-radius: 2px; background: var(--surface2); overflow: hidden;
+  }
+  .loading-progress-bar {
+    height: 100%; width: 0%; border-radius: 2px;
+    background: linear-gradient(90deg, var(--accent), var(--accent2));
+    transition: width .3s;
+  }
+
+  /* Remove bg button */
+  .btn-magic {
+    background: linear-gradient(135deg, var(--accent), var(--accent2));
+    color: #fff; position: relative; overflow: hidden;
+  }
+  .btn-magic:hover { filter: brightness(1.1); }
+  .btn-magic::before {
+    content: ''; position: absolute; inset: 0;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,.15), transparent);
+    transform: translateX(-100%); animation: shimmer 2.5s infinite;
+  }
+  @keyframes shimmer { to { transform: translateX(100%); } }
+
+  @media (max-width: 800px) {
+    .workspace.active { flex-direction: column; }
+    .sidebar { flex: none; position: static; height: auto; flex-direction: row; flex-wrap: wrap; overflow: visible; }
+    .sidebar .panel { flex: 1; min-width: 240px; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Pixel & ASCII Art Stylizer</h1>
+  <p>上传图片或视频，选择风格，实时预览像素化 / 字符画 / 半色调等效果</p>
+</header>
+
+<div class="app">
+  <div class="upload-zone" id="uploadZone">
+    <svg width="44" height="44" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
+      <path d="M12 16V4m0 0L8 8m4-4l4 4M4 17v2a1 1 0 001 1h14a1 1 0 001-1v-2"/>
+    </svg>
+    <div class="label">拖拽文件到这里，或 <span>点击上传</span></div>
+    <div class="sub">支持 JPG / PNG / GIF / MP4 / WebM</div>
+    <input type="file" id="fileInput" accept="image/*,video/mp4,video/webm,video/ogg" style="display:none">
+  </div>
+
+  <div class="workspace" id="workspace">
+    <div class="sidebar">
+
+      <div class="panel">
+        <div class="panel-title">风格模式</div>
+        <div class="chip-group" id="styleGroup">
+          <button class="chip active" data-style="square">方块</button>
+          <button class="chip" data-style="dot">圆点</button>
+          <button class="chip" data-style="diamond">菱形</button>
+          <button class="chip" data-style="cross">十字</button>
+          <button class="chip" data-style="halftone">半色调</button>
+          <button class="chip" data-style="line">线条</button>
+          <button class="chip" data-style="engrave">蚀刻</button>
+          <button class="chip" data-style="ascii">ASCII</button>
+          <button class="chip" data-style="braille">Braille</button>
+        </div>
+      </div>
+
+      <div class="panel" id="asciiPanel" style="display:none">
+        <div class="panel-title">字符设置</div>
+        <div class="ctrl">
+          <div class="ctrl-label">字符集</div>
+          <div class="chip-group" id="charsetGroup">
+            <button class="chip active" data-charset=" .:-=+*#%@">标准</button>
+            <button class="chip" data-charset=" ░▒▓█">方块</button>
+            <button class="chip" data-charset=" ·•●">极简</button>
+            <button class="chip" data-charset="01">二进制</button>
+            <button class="chip" data-charset="custom">自定义</button>
+          </div>
+        </div>
+        <div class="ctrl" id="customCharRow" style="display:none">
+          <input type="text" class="custom-input" id="customChars" value=" .oO@" placeholder="输入字符（从暗到亮）">
+        </div>
+        <div class="ctrl">
+          <div class="ctrl-label">字体大小 <span class="v" id="fontSizeVal">10</span>px</div>
+          <input type="range" id="fontSize" min="4" max="24" value="10">
+        </div>
+        <div class="ctrl">
+          <div class="ctrl-label">字体</div>
+          <div class="chip-group" id="fontGroup">
+            <button class="chip active" data-font="monospace">Mono</button>
+            <button class="chip" data-font="'Courier New'">Courier</button>
+            <button class="chip" data-font="Helvetica,sans-serif">Helvetica</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-title">几何参数</div>
+        <div class="ctrl">
+          <div class="ctrl-label">单元格大小 <span class="v" id="cellVal">8</span></div>
+          <input type="range" id="cellSize" min="2" max="48" value="8">
+        </div>
+        <div class="ctrl" id="dotRatioCtrl" style="display:none">
+          <div class="ctrl-label">填充比例 <span class="v" id="dotRatioVal">80%</span></div>
+          <input type="range" id="dotRatio" min="10" max="100" value="80">
+        </div>
+        <div class="ctrl">
+          <div class="ctrl-label">预模糊 <span class="v" id="blurVal">0</span></div>
+          <input type="range" id="blur" min="0" max="5" value="0">
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-title">色彩</div>
+        <div class="ctrl">
+          <div class="ctrl-label">颜色模式</div>
+          <div class="chip-group" id="colorModeGroup">
+            <button class="chip active" data-cm="full">原色</button>
+            <button class="chip" data-cm="gray">灰度</button>
+            <button class="chip" data-cm="matrix">Matrix</button>
+            <button class="chip" data-cm="amber">琥珀</button>
+            <button class="chip" data-cm="cyan">青蓝</button>
+            <button class="chip" data-cm="custom">自定义</button>
+          </div>
+        </div>
+        <div class="ctrl" id="customColorCtrl" style="display:none">
+          <div class="ctrl-label" style="gap:8px">
+            前景 <input type="color" id="fgColor" value="#00ff41">
+            背景 <input type="color" id="bgColorPick" value="#000000">
+          </div>
+        </div>
+        <div class="ctrl">
+          <div class="ctrl-label">色阶限制</div>
+          <div class="chip-group" id="quantGroup">
+            <button class="chip active" data-q="0">全色</button>
+            <button class="chip" data-q="64">64</button>
+            <button class="chip" data-q="16">16</button>
+            <button class="chip" data-q="8">8</button>
+            <button class="chip" data-q="4">4</button>
+          </div>
+        </div>
+        <div class="toggle-row">
+          反色 <button class="toggle" id="invertToggle"></button>
+        </div>
+        <div class="ctrl">
+          <div class="ctrl-label">亮度 <span class="v" id="brightVal">0</span></div>
+          <input type="range" id="bright" min="-50" max="50" value="0">
+        </div>
+        <div class="ctrl">
+          <div class="ctrl-label">对比度 <span class="v" id="contrastVal">0</span></div>
+          <input type="range" id="contrast" min="-50" max="50" value="0">
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-title">抖动算法</div>
+        <div class="chip-group" id="ditherGroup">
+          <button class="chip active" data-dither="none">无</button>
+          <button class="chip" data-dither="floyd">Floyd-Steinberg</button>
+          <button class="chip" data-dither="bayer">Bayer 有序</button>
+          <button class="chip" data-dither="atkinson">Atkinson</button>
+        </div>
+        <div class="ctrl" id="ditherStrCtrl" style="display:none">
+          <div class="ctrl-label">抖动强度 <span class="v" id="ditherStrVal">0.8</span></div>
+          <input type="range" id="ditherStr" min="10" max="100" value="80">
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-title">后处理特效</div>
+        <div class="toggle-row">
+          网格线 <button class="toggle" id="gridToggle"></button>
+        </div>
+        <div class="ctrl" id="gridAlphaCtrl" style="display:none">
+          <div class="ctrl-label">网格透明度 <span class="v" id="gridAlphaVal">20%</span></div>
+          <input type="range" id="gridAlpha" min="5" max="100" value="20">
+        </div>
+        <div class="ctrl">
+          <div class="ctrl-label">暗角 <span class="v" id="vignetteVal">0</span></div>
+          <input type="range" id="vignette" min="0" max="100" value="0">
+        </div>
+        <div class="toggle-row">
+          CRT 扫描线 <button class="toggle" id="crtToggle"></button>
+        </div>
+        <div class="toggle-row">
+          亮度映射大小 <button class="toggle" id="lumSizeToggle"></button>
+        </div>
+      </div>
+
+      <!-- Particle animation -->
+      <div class="panel">
+        <div class="panel-title">粒子动画</div>
+        <div class="toggle-row">
+          启用动画 <button class="toggle" id="particleToggle"></button>
+        </div>
+        <div id="particleOpts" style="display:none;display:flex;flex-direction:column;gap:12px;display:none">
+          <div class="ctrl">
+            <div class="ctrl-label">动画模式</div>
+            <div class="chip-group" id="patternGroup">
+              <button class="chip active" data-pat="wave">波浪</button>
+              <button class="chip" data-pat="breathe">呼吸</button>
+              <button class="chip" data-pat="spiral">旋涡</button>
+              <button class="chip" data-pat="float">漂浮</button>
+              <button class="chip" data-pat="pulse">脉冲</button>
+            </div>
+          </div>
+          <div class="ctrl">
+            <div class="ctrl-label">速度 <span class="v" id="pSpeedVal">1.0</span></div>
+            <input type="range" id="pSpeed" min="1" max="30" value="10">
+          </div>
+          <div class="ctrl">
+            <div class="ctrl-label">振幅 <span class="v" id="pAmpVal">12</span></div>
+            <input type="range" id="pAmp" min="1" max="60" value="12">
+          </div>
+          <div class="ctrl">
+            <div class="ctrl-label">弹性 <span class="v" id="pSpringVal">0.08</span></div>
+            <input type="range" id="pSpring" min="1" max="20" value="8">
+          </div>
+          <div class="ctrl">
+            <div class="ctrl-label">阻尼 <span class="v" id="pDampVal">0.88</span></div>
+            <input type="range" id="pDamp" min="70" max="98" value="88">
+          </div>
+          <div class="ctrl">
+            <div class="ctrl-label">鼠标交互</div>
+            <div class="chip-group" id="mouseGroup">
+              <button class="chip active" data-mm="push">推开</button>
+              <button class="chip" data-mm="attract">吸引</button>
+              <button class="chip" data-mm="none">关闭</button>
+            </div>
+          </div>
+          <div class="ctrl">
+            <div class="ctrl-label">鼠标力度 <span class="v" id="mStrVal">50</span></div>
+            <input type="range" id="mStr" min="5" max="200" value="50">
+          </div>
+          <div class="ctrl">
+            <div class="ctrl-label">影响半径 <span class="v" id="mRadVal">120</span>px</div>
+            <input type="range" id="mRad" min="30" max="400" value="120">
+          </div>
+        </div>
+      </div>
+
+      <div class="panel" id="bgPanel">
+        <div class="panel-title">背景色</div>
+        <div class="chip-group" id="bgGroup">
+          <button class="chip active" data-bg="#000000">黑</button>
+          <button class="chip" data-bg="#ffffff">白</button>
+          <button class="chip" data-bg="#0d1117">深灰</button>
+          <button class="chip" data-bg="#1a1a2e">深蓝</button>
+          <button class="chip" data-bg="#f5f0e8">米</button>
+          <button class="chip" data-bg="transparent">透明</button>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-title">AI 工具</div>
+        <button class="btn btn-magic" id="removeBgBtn" style="width:100%">
+          <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M20.84 4.61a5.5 5.5 0 00-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 00-7.78 7.78L12 21.23l8.84-8.84a5.5 5.5 0 000-7.78z"/></svg>
+          AI 去背景
+        </button>
+        <div class="ctrl-label" style="font-size:11px;color:var(--text2);opacity:.7">首次使用需下载模型 (~30MB)</div>
+      </div>
+
+      <div class="panel">
+        <div class="btn-row">
+          <button class="btn btn-sm" id="resetBtn">重置</button>
+          <button class="btn btn-primary" id="downloadBtn">下载 PNG</button>
+        </div>
+        <button class="btn btn-sm" id="recordBtn" style="display:none;width:100%">录制导出 WebM</button>
+        <button class="btn btn-sm" id="exportJsonBtn" style="width:100%">导出 JSON 配置</button>
+        <button class="btn btn-sm" id="newImgBtn" style="width:100%">更换素材</button>
+      </div>
+    </div>
+
+    <div class="preview">
+      <div class="tab-bar">
+        <button class="tab active" data-tab="render">效果</button>
+        <button class="tab" data-tab="original">原图</button>
+        <button class="tab" data-tab="split">对比</button>
+      </div>
+      <div class="canvas-wrap">
+        <canvas id="canvas"></canvas>
+        <video id="videoEl" style="display:none" playsinline></video>
+        <!-- Video controls -->
+        <div class="video-bar" id="videoBar">
+          <input type="range" class="video-timeline" id="timeline" min="0" max="1000" value="0">
+          <div class="video-ctrl-row">
+            <button class="v-btn" id="playBtn" title="播放/暂停">
+              <svg id="playIcon" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+              <svg id="pauseIcon" viewBox="0 0 24 24" style="display:none"><path d="M6 4h4v16H6zm8 0h4v16h-4z"/></svg>
+            </button>
+            <span class="video-time" id="videoTime">0:00 / 0:00</span>
+            <span id="recIndicator" style="display:none;display:flex;align-items:center;gap:4px;display:none"><span class="rec-dot"></span>REC</span>
+            <span class="video-fps" id="fpsDisplay"></span>
+          </div>
+        </div>
+      </div>
+      <div class="info-bar" id="infoBar"></div>
+    </div>
+  </div>
+</div>
+
+<!-- Loading overlay -->
+<div class="loading-overlay" id="loadingOverlay">
+  <div class="loading-spinner"></div>
+  <div class="loading-text" id="loadingText">正在处理...</div>
+  <div class="loading-progress"><div class="loading-progress-bar" id="loadingBar"></div></div>
+  <div class="loading-sub" id="loadingSub"></div>
+</div>
+
+<script>
+const $ = s => document.querySelector(s);
+const $$ = s => document.querySelectorAll(s);
+
+/* ──── state ──── */
+const S = {
+  img: null,
+  video: null,
+  sourceType: 'image',
+  style: 'square',
+  cellSize: 8,
+  dotRatio: 0.8,
+  blur: 0,
+  colorMode: 'full',
+  fgColor: '#00ff41',
+  bgColorCustom: '#000000',
+  quantize: 0,
+  invert: false,
+  bright: 0,
+  contrast: 0,
+  dither: 'none',
+  ditherStr: 0.8,
+  showGrid: false,
+  gridAlpha: 0.2,
+  vignette: 0,
+  crt: false,
+  lumSize: false,
+  bgColor: '#000000',
+  tab: 'render',
+  charset: ' .:-=+*#%@',
+  fontSize: 10,
+  fontFamily: 'monospace',
+  playing: false,
+  recording: false,
+  particleMode: false,
+  particlePattern: 'wave',
+  pSpeed: 1.0,
+  pAmp: 12,
+  pSpring: 0.08,
+  pDamp: 0.88,
+  mouseMode: 'push',
+  mouseStr: 50,
+  mouseRad: 120,
+  mouseX: -9999,
+  mouseY: -9999
+};
+
+const canvas = $('#canvas');
+const ctx = canvas.getContext('2d', { willReadFrequently: true });
+const videoEl = $('#videoEl');
+
+function getSource() { return S.sourceType === 'video' ? videoEl : S.img; }
+function srcW() { const s = getSource(); return s.videoWidth || s.width; }
+function srcH() { const s = getSource(); return s.videoHeight || s.height; }
+
+/* ──── upload ──── */
+const uploadZone = $('#uploadZone'), fileInput = $('#fileInput');
+uploadZone.addEventListener('click', () => fileInput.click());
+uploadZone.addEventListener('dragover', e => { e.preventDefault(); uploadZone.classList.add('drag-over'); });
+uploadZone.addEventListener('dragleave', () => uploadZone.classList.remove('drag-over'));
+uploadZone.addEventListener('drop', e => {
+  e.preventDefault(); uploadZone.classList.remove('drag-over');
+  if (e.dataTransfer.files[0]) loadFile(e.dataTransfer.files[0]);
+});
+fileInput.addEventListener('change', e => { if (e.target.files[0]) loadFile(e.target.files[0]); });
+$('#newImgBtn').addEventListener('click', () => { fileInput.value = ''; fileInput.click(); });
+
+function loadFile(file) {
+  stopVideoLoop();
+  const url = URL.createObjectURL(file);
+
+  if (file.type.startsWith('video/')) {
+    S.sourceType = 'video';
+    S.img = null;
+    videoEl.src = url;
+    videoEl.muted = true;
+    videoEl.loop = true;
+    videoEl.onloadeddata = () => {
+      uploadZone.classList.add('hidden');
+      $('#workspace').classList.add('active');
+      $('#videoBar').classList.add('active');
+      $('#recordBtn').style.display = '';
+      $('#downloadBtn').textContent = '截图 PNG';
+      videoEl.pause();
+      videoEl.currentTime = 0;
+      S.playing = false;
+      updatePlayIcon();
+      render();
+    };
+    videoEl.load();
+  } else {
+    S.sourceType = 'image';
+    S.video = null;
+    videoEl.src = '';
+    const img = new Image();
+    img.onload = () => {
+      S.img = img;
+      uploadZone.classList.add('hidden');
+      $('#workspace').classList.add('active');
+      $('#videoBar').classList.remove('active');
+      $('#recordBtn').style.display = 'none';
+      $('#downloadBtn').textContent = '下载 PNG';
+      render();
+    };
+    img.src = url;
+  }
+}
+
+/* ──── video playback ──── */
+let videoLoopId = null;
+let lastFrameTime = 0;
+let fpsArr = [];
+
+function startVideoLoop() {
+  S.playing = true;
+  videoEl.play();
+  updatePlayIcon();
+  lastFrameTime = performance.now();
+  fpsArr = [];
+  videoLoop();
+}
+
+function stopVideoLoop() {
+  S.playing = false;
+  if (videoLoopId) { cancelAnimationFrame(videoLoopId); videoLoopId = null; }
+  if (videoEl.src) videoEl.pause();
+  updatePlayIcon();
+}
+
+function videoLoop() {
+  if (!S.playing) return;
+  videoLoopId = requestAnimationFrame(() => {
+    const now = performance.now();
+    const dt = now - lastFrameTime;
+    if (dt > 0) { fpsArr.push(1000 / dt); if (fpsArr.length > 30) fpsArr.shift(); }
+    lastFrameTime = now;
+
+    _render();
+    updateTimeline();
+    updateFPS();
+    videoLoop();
+  });
+}
+
+function updatePlayIcon() {
+  $('#playIcon').style.display = S.playing ? 'none' : '';
+  $('#pauseIcon').style.display = S.playing ? '' : 'none';
+}
+
+function updateTimeline() {
+  if (!videoEl.duration) return;
+  $('#timeline').value = (videoEl.currentTime / videoEl.duration * 1000) | 0;
+  const fmt = t => { const m = (t/60)|0, s = (t%60)|0; return m + ':' + String(s).padStart(2,'0'); };
+  $('#videoTime').textContent = fmt(videoEl.currentTime) + ' / ' + fmt(videoEl.duration);
+}
+
+function updateFPS() {
+  if (!fpsArr.length) return;
+  const avg = fpsArr.reduce((a,b) => a+b, 0) / fpsArr.length;
+  $('#fpsDisplay').textContent = `${avg.toFixed(0)} FPS`;
+}
+
+$('#playBtn').addEventListener('click', () => {
+  if (S.sourceType !== 'video') return;
+  if (S.playing) stopVideoLoop(); else startVideoLoop();
+});
+
+$('#timeline').addEventListener('input', e => {
+  if (S.sourceType !== 'video' || !videoEl.duration) return;
+  videoEl.currentTime = (+e.target.value / 1000) * videoEl.duration;
+  if (!S.playing) render();
+});
+
+/* ──── recording ──── */
+let mediaRecorder = null;
+let recordChunks = [];
+
+$('#recordBtn').addEventListener('click', () => {
+  if (S.recording) { stopRecording(); return; }
+  startRecording();
+});
+
+function startRecording() {
+  if (S.sourceType !== 'video') return;
+  const stream = canvas.captureStream(30);
+  mediaRecorder = new MediaRecorder(stream, { mimeType: 'video/webm; codecs=vp9', videoBitsPerSecond: 5000000 });
+  recordChunks = [];
+  mediaRecorder.ondataavailable = e => { if (e.data.size > 0) recordChunks.push(e.data); };
+  mediaRecorder.onstop = () => {
+    const blob = new Blob(recordChunks, { type: 'video/webm' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = `stylized-${S.style}.webm`; a.click();
+    URL.revokeObjectURL(url);
+    S.recording = false;
+    $('#recordBtn').textContent = '录制导出 WebM';
+    $('#recordBtn').classList.remove('btn-danger');
+    $('#recordBtn').classList.add('btn-sm');
+    $('#recIndicator').style.display = 'none';
+  };
+  mediaRecorder.start();
+  S.recording = true;
+  $('#recordBtn').textContent = '停止录制';
+  $('#recordBtn').classList.remove('btn-sm');
+  $('#recordBtn').classList.add('btn-danger');
+  $('#recIndicator').style.display = 'flex';
+  if (!S.playing) startVideoLoop();
+}
+
+function stopRecording() {
+  if (mediaRecorder && mediaRecorder.state !== 'inactive') mediaRecorder.stop();
+}
+
+/* ──── AI background removal ──── */
+let removeBgModule = null;
+
+$('#removeBgBtn').addEventListener('click', removeBg);
+
+async function removeBg() {
+  const src = getSource();
+  if (!src) return;
+
+  const overlay = $('#loadingOverlay');
+  const textEl = $('#loadingText');
+  const subEl = $('#loadingSub');
+  const barEl = $('#loadingBar');
+  overlay.classList.add('active');
+  textEl.textContent = '正在加载 AI 模型...';
+  subEl.textContent = '首次使用需下载约 30MB 模型文件';
+  barEl.style.width = '0%';
+
+  try {
+    if (!removeBgModule) {
+      textEl.textContent = '正在下载 AI 模型...';
+      removeBgModule = await import('https://cdn.jsdelivr.net/npm/@imgly/background-removal@1.5.6/+esm');
+      barEl.style.width = '30%';
+    }
+
+    textEl.textContent = '正在分析图像并去除背景...';
+    subEl.textContent = '使用 ISNET 深度学习模型分割前景';
+    barEl.style.width = '40%';
+
+    const tmpCanvas = document.createElement('canvas');
+    const w = srcW(), h = srcH();
+    tmpCanvas.width = w; tmpCanvas.height = h;
+    tmpCanvas.getContext('2d').drawImage(src, 0, 0, w, h);
+    const blob = await new Promise(r => tmpCanvas.toBlob(r, 'image/png'));
+
+    let lastPct = 40;
+    const resultBlob = await removeBgModule.removeBackground(blob, {
+      progress: (key, current, total) => {
+        if (total > 0) {
+          const pct = Math.round(40 + (current / total) * 55);
+          if (pct > lastPct) { lastPct = pct; barEl.style.width = pct + '%'; }
+        }
+        if (key.includes('inference')) {
+          textEl.textContent = '神经网络推理中...';
+        } else if (key.includes('download')) {
+          textEl.textContent = '下载模型文件中...';
+        }
+      }
+    });
+
+    barEl.style.width = '95%';
+    textEl.textContent = '生成结果...';
+
+    const img = new Image();
+    img.onload = () => {
+      S.img = img;
+      if (S.sourceType === 'video') {
+        S.sourceType = 'image';
+        stopVideoLoop();
+        $('#videoBar').classList.remove('active');
+        $('#recordBtn').style.display = 'none';
+        $('#downloadBtn').textContent = '下载 PNG';
+      }
+      barEl.style.width = '100%';
+      setTimeout(() => { overlay.classList.remove('active'); }, 300);
+      render();
+    };
+    img.src = URL.createObjectURL(resultBlob);
+
+  } catch (err) {
+    console.error('Background removal failed:', err);
+    textEl.textContent = '处理失败';
+    subEl.textContent = err.message || '请检查网络连接后重试';
+    barEl.style.width = '0%';
+    setTimeout(() => overlay.classList.remove('active'), 2500);
+  }
+}
+
+/* ──── chip helper ──── */
+function chipBind(sel, key, cb) {
+  $$(sel).forEach(c => c.addEventListener('click', () => {
+    $$(sel).forEach(b => b.classList.remove('active'));
+    c.classList.add('active');
+    if (cb) cb(c); else { S[key] = c.dataset[Object.keys(c.dataset)[0]]; render(); }
+  }));
+}
+
+/* ──── controls ──── */
+chipBind('#styleGroup .chip', 'style', c => {
+  S.style = c.dataset.style;
+  const isShape = !['square','ascii','braille'].includes(S.style);
+  const isText = ['ascii','braille'].includes(S.style);
+  $('#dotRatioCtrl').style.display = (isShape || S.style === 'engrave') ? '' : 'none';
+  $('#asciiPanel').style.display = isText ? '' : 'none';
+  if (S.particleMode) initParticles();
+  render();
+});
+
+chipBind('#charsetGroup .chip', null, c => {
+  const v = c.dataset.charset;
+  if (v === 'custom') { $('#customCharRow').style.display = ''; S.charset = $('#customChars').value || ' .oO@'; }
+  else { $('#customCharRow').style.display = 'none'; S.charset = v; }
+  render();
+});
+$('#customChars').addEventListener('input', e => { S.charset = e.target.value || ' '; render(); });
+$('#fontSize').addEventListener('input', e => { S.fontSize = +e.target.value; $('#fontSizeVal').textContent = S.fontSize; render(); });
+chipBind('#fontGroup .chip', null, c => { S.fontFamily = c.dataset.font; render(); });
+$('#cellSize').addEventListener('input', e => { S.cellSize = +e.target.value; $('#cellVal').textContent = S.cellSize; if (S.particleMode) initParticles(); render(); });
+$('#dotRatio').addEventListener('input', e => { S.dotRatio = +e.target.value / 100; $('#dotRatioVal').textContent = e.target.value + '%'; render(); });
+$('#blur').addEventListener('input', e => { S.blur = +e.target.value; $('#blurVal').textContent = S.blur; render(); });
+
+chipBind('#colorModeGroup .chip', null, c => {
+  S.colorMode = c.dataset.cm;
+  $('#customColorCtrl').style.display = S.colorMode === 'custom' ? '' : 'none';
+  render();
+});
+$('#fgColor').addEventListener('input', e => { S.fgColor = e.target.value; render(); });
+$('#bgColorPick').addEventListener('input', e => { S.bgColorCustom = e.target.value; render(); });
+chipBind('#quantGroup .chip', null, c => { S.quantize = +c.dataset.q; render(); });
+$('#invertToggle').addEventListener('click', function() { S.invert = !S.invert; this.classList.toggle('on', S.invert); render(); });
+$('#bright').addEventListener('input', e => { S.bright = +e.target.value; $('#brightVal').textContent = S.bright; render(); });
+$('#contrast').addEventListener('input', e => { S.contrast = +e.target.value; $('#contrastVal').textContent = S.contrast; render(); });
+
+chipBind('#ditherGroup .chip', null, c => {
+  S.dither = c.dataset.dither;
+  $('#ditherStrCtrl').style.display = S.dither !== 'none' ? '' : 'none';
+  render();
+});
+$('#ditherStr').addEventListener('input', e => { S.ditherStr = +e.target.value / 100; $('#ditherStrVal').textContent = S.ditherStr.toFixed(2); render(); });
+
+$('#gridToggle').addEventListener('click', function() { S.showGrid = !S.showGrid; this.classList.toggle('on', S.showGrid); $('#gridAlphaCtrl').style.display = S.showGrid ? '' : 'none'; render(); });
+$('#gridAlpha').addEventListener('input', e => { S.gridAlpha = +e.target.value / 100; $('#gridAlphaVal').textContent = e.target.value + '%'; render(); });
+$('#vignette').addEventListener('input', e => { S.vignette = +e.target.value / 100; $('#vignetteVal').textContent = e.target.value; render(); });
+$('#crtToggle').addEventListener('click', function() { S.crt = !S.crt; this.classList.toggle('on', S.crt); render(); });
+$('#lumSizeToggle').addEventListener('click', function() { S.lumSize = !S.lumSize; this.classList.toggle('on', S.lumSize); render(); });
+chipBind('#bgGroup .chip', null, c => { S.bgColor = c.dataset.bg; render(); });
+
+/* ──── particle controls ──── */
+$('#particleToggle').addEventListener('click', function() {
+  S.particleMode = !S.particleMode;
+  this.classList.toggle('on', S.particleMode);
+  $('#particleOpts').style.display = S.particleMode ? 'flex' : 'none';
+  if (S.particleMode) startParticleAnim();
+  else stopParticleAnim();
+});
+chipBind('#patternGroup .chip', null, c => { S.particlePattern = c.dataset.pat; });
+$('#pSpeed').addEventListener('input', e => { S.pSpeed = +e.target.value / 10; $('#pSpeedVal').textContent = S.pSpeed.toFixed(1); });
+$('#pAmp').addEventListener('input', e => { S.pAmp = +e.target.value; $('#pAmpVal').textContent = S.pAmp; });
+$('#pSpring').addEventListener('input', e => { S.pSpring = +e.target.value / 100; $('#pSpringVal').textContent = S.pSpring.toFixed(2); });
+$('#pDamp').addEventListener('input', e => { S.pDamp = +e.target.value / 100; $('#pDampVal').textContent = S.pDamp.toFixed(2); });
+chipBind('#mouseGroup .chip', null, c => { S.mouseMode = c.dataset.mm; });
+$('#mStr').addEventListener('input', e => { S.mouseStr = +e.target.value; $('#mStrVal').textContent = S.mouseStr; });
+$('#mRad').addEventListener('input', e => { S.mouseRad = +e.target.value; $('#mRadVal').textContent = S.mouseRad; });
+
+canvas.addEventListener('mousemove', e => {
+  const rect = canvas.getBoundingClientRect();
+  S.mouseX = (e.clientX - rect.left) * (canvas.width / rect.width);
+  S.mouseY = (e.clientY - rect.top) * (canvas.height / rect.height);
+});
+canvas.addEventListener('mouseleave', () => { S.mouseX = S.mouseY = -9999; });
+
+/* ──── JSON export ──── */
+$('#exportJsonBtn').addEventListener('click', exportJSON);
+function exportJSON() {
+  const src = getSource();
+  if (!src) return;
+  const w = srcW(), h = srcH();
+  const cs = S.cellSize;
+  const cols = Math.max(1, Math.ceil(w / cs));
+  const rows = Math.max(1, Math.ceil(h / cs));
+  const d = sampleAndProcess(cols, rows, src, w, h);
+
+  const particleArr = [];
+  for (let row = 0; row < rows; row++) {
+    for (let col = 0; col < cols; col++) {
+      const i = (row * cols + col) * 4;
+      const a = d[i + 3];
+      if (a === 0) continue;
+      particleArr.push({
+        x: Math.round(col * cs + cs / 2),
+        y: Math.round(row * cs + cs / 2),
+        r: d[i], g: d[i + 1], b: d[i + 2], a
+      });
+    }
+  }
+
+  const data = {
+    meta: {
+      width: w, height: h, cellSize: cs,
+      style: S.style, colorMode: S.colorMode,
+      particleCount: particleArr.length,
+      exportedAt: new Date().toISOString()
+    },
+    settings: {
+      style: S.style, cellSize: S.cellSize, dotRatio: S.dotRatio,
+      colorMode: S.colorMode, quantize: S.quantize, invert: S.invert,
+      bright: S.bright, contrast: S.contrast, dither: S.dither,
+      ditherStr: S.ditherStr, bgColor: S.bgColor
+    },
+    animation: {
+      pattern: S.particlePattern,
+      speed: S.pSpeed, amplitude: S.pAmp,
+      spring: S.pSpring, damping: S.pDamp
+    },
+    mouse: {
+      mode: S.mouseMode,
+      strength: S.mouseStr, radius: S.mouseRad
+    },
+    particles: particleArr
+  };
+
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `pixel-particles-${S.style}.json`;
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+
+$$('.tab').forEach(t => t.addEventListener('click', () => {
+  $$('.tab').forEach(b => b.classList.remove('active')); t.classList.add('active');
+  S.tab = t.dataset.tab; render();
+}));
+
+$('#downloadBtn').addEventListener('click', () => {
+  const a = document.createElement('a');
+  a.download = `stylized-${S.style}.png`;
+  a.href = canvas.toDataURL('image/png');
+  a.click();
+});
+
+$('#resetBtn').addEventListener('click', () => {
+  stopParticleAnim();
+  S.particleMode = false;
+  Object.assign(S, {
+    style:'square', cellSize:8, dotRatio:0.8, blur:0, colorMode:'full',
+    quantize:0, invert:false, bright:0, contrast:0, dither:'none', ditherStr:0.8,
+    showGrid:false, gridAlpha:0.2, vignette:0, crt:false, lumSize:false,
+    bgColor:'#000000', charset:' .:-=+*#%@', fontSize:10, fontFamily:'monospace',
+    particlePattern:'wave', pSpeed:1.0, pAmp:12, pSpring:0.08, pDamp:0.88,
+    mouseMode:'push', mouseStr:50, mouseRad:120
+  });
+  document.querySelectorAll('.toggle.on').forEach(t => t.classList.remove('on'));
+  ['#cellSize','#dotRatio','#blur','#bright','#contrast','#gridAlpha','#vignette','#ditherStr','#fontSize','#pSpeed','#pAmp','#pSpring','#pDamp','#mStr','#mRad'].forEach(s => { try { $(s).value = $(s).defaultValue; } catch(e){} });
+  ['#cellVal:8','#dotRatioVal:80%','#blurVal:0','#brightVal:0','#contrastVal:0','#gridAlphaVal:20%','#vignetteVal:0','#ditherStrVal:0.8','#fontSizeVal:10','#pSpeedVal:1.0','#pAmpVal:12','#pSpringVal:0.08','#pDampVal:0.88','#mStrVal:50','#mRadVal:120'].forEach(p => { const [s,v] = p.split(':'); try { $(s).textContent = v; } catch(e){} });
+  $$('.chip-group').forEach(g => { const chips = g.querySelectorAll('.chip'); chips.forEach(c => c.classList.remove('active')); if (chips[0]) chips[0].classList.add('active'); });
+  ['#dotRatioCtrl','#asciiPanel','#customCharRow','#customColorCtrl','#gridAlphaCtrl','#ditherStrCtrl','#particleOpts'].forEach(s => $(s).style.display = 'none');
+  render();
+});
+
+/* ──── rendering ──── */
+let raf = null;
+function render() {
+  if (S.playing || S.particleMode) return;
+  if (raf) cancelAnimationFrame(raf);
+  raf = requestAnimationFrame(_render);
+}
+
+function _render() {
+  const src = getSource();
+  if (!src || (S.sourceType === 'image' && !S.img)) return;
+  const w = srcW(), h = srcH();
+  if (!w || !h) return;
+  canvas.width = w; canvas.height = h;
+
+  if (S.tab === 'original') { ctx.drawImage(src, 0, 0, w, h); updateInfo(w, h); return; }
+  if (S.tab === 'split') {
+    drawStylized(w, h, src);
+    ctx.save(); ctx.beginPath(); ctx.rect(w/2, 0, w/2, h); ctx.clip();
+    ctx.drawImage(src, 0, 0, w, h); ctx.restore();
+    ctx.strokeStyle = '#fff'; ctx.lineWidth = 2; ctx.setLineDash([6,4]);
+    ctx.beginPath(); ctx.moveTo(w/2, 0); ctx.lineTo(w/2, h); ctx.stroke(); ctx.setLineDash([]);
+    updateInfo(w, h); return;
+  }
+  drawStylized(w, h, src);
+  updateInfo(w, h);
+}
+
+function drawStylized(w, h, src) {
+  const { cellSize: cs, style } = S;
+  const cols = Math.max(1, Math.ceil(w / cs));
+  const rows = Math.max(1, Math.ceil(h / cs));
+  const pixels = sampleAndProcess(cols, rows, src, w, h);
+
+  if (style === 'ascii' || style === 'braille') drawTextMode(w, h, pixels, cols, rows);
+  else if (style === 'square') drawSquare(w, h, pixels, cols, rows);
+  else if (style === 'engrave') drawEngrave(w, h, src);
+  else drawShapes(w, h, pixels, cols, rows);
+
+  if (S.showGrid && cs >= 3) drawGrid(w, h, cs);
+  if (S.vignette > 0) drawVignette(w, h);
+  if (S.crt) drawCRT(w, h);
+}
+
+function sampleAndProcess(cols, rows, src, w, h) {
+  const tmp = document.createElement('canvas');
+  const tc = tmp.getContext('2d', { willReadFrequently: true });
+  const bl = S.blur;
+
+  if (bl > 0) {
+    tmp.width = w; tmp.height = h;
+    tc.filter = `blur(${bl}px)`; tc.drawImage(src, 0, 0, w, h); tc.filter = 'none';
+    const b = tmp; tmp.width = cols; tmp.height = rows;
+    tc.drawImage(b, 0, 0, cols, rows);
+  } else {
+    tmp.width = cols; tmp.height = rows;
+    tc.drawImage(src, 0, 0, cols, rows);
+  }
+
+  const id = tc.getImageData(0, 0, cols, rows);
+  const d = id.data;
+
+  if (S.bright !== 0 || S.contrast !== 0) {
+    const b = S.bright * 2.55, cf = (S.contrast + 100) / 100, ic = 128 * (1 - cf);
+    for (let i = 0; i < d.length; i += 4) {
+      d[i] = cl(d[i]*cf+ic+b); d[i+1] = cl(d[i+1]*cf+ic+b); d[i+2] = cl(d[i+2]*cf+ic+b);
+    }
+  }
+  if (S.invert) { for (let i = 0; i < d.length; i += 4) { d[i]=255-d[i]; d[i+1]=255-d[i+1]; d[i+2]=255-d[i+2]; } }
+  if (S.quantize > 0) {
+    const step = 256 / Math.cbrt(S.quantize);
+    for (let i = 0; i < d.length; i += 4) { d[i]=Math.round(d[i]/step)*step; d[i+1]=Math.round(d[i+1]/step)*step; d[i+2]=Math.round(d[i+2]/step)*step; }
+  }
+  applyColorMode(d);
+  if (S.dither !== 'none') applyDither(d, cols, rows);
+  return d;
+}
+
+function applyColorMode(d) {
+  const m = S.colorMode;
+  if (m === 'full') return;
+  for (let i = 0; i < d.length; i += 4) {
+    const lum = d[i]*0.299 + d[i+1]*0.587 + d[i+2]*0.114;
+    if (m === 'gray') { d[i]=d[i+1]=d[i+2]=lum; }
+    else if (m === 'matrix') { d[i]=0; d[i+1]=cl(lum*1.1); d[i+2]=cl(lum*0.2); }
+    else if (m === 'amber') { d[i]=cl(lum*1.1); d[i+1]=cl(lum*0.7); d[i+2]=0; }
+    else if (m === 'cyan') { d[i]=0; d[i+1]=cl(lum*0.9); d[i+2]=cl(lum*1.1); }
+    else if (m === 'custom') {
+      const fg = hexRgb(S.fgColor);
+      d[i]=cl(lum/255*fg[0]); d[i+1]=cl(lum/255*fg[1]); d[i+2]=cl(lum/255*fg[2]);
+    }
+  }
+}
+
+function applyDither(d, w, h) {
+  const str = S.ditherStr;
+  if (S.dither === 'bayer') {
+    const bayer4 = [[0,8,2,10],[12,4,14,6],[3,11,1,9],[15,7,13,5]];
+    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+      const i = (y*w+x)*4;
+      const threshold = (bayer4[y%4][x%4]/16 - 0.5)*64*str;
+      d[i]=cl(d[i]+threshold); d[i+1]=cl(d[i+1]+threshold); d[i+2]=cl(d[i+2]+threshold);
+    }
+  } else {
+    const errDiffuse = S.dither === 'atkinson'
+      ? [[1,0,1/8],[2,0,1/8],[-1,1,1/8],[0,1,1/8],[1,1,1/8],[0,2,1/8]]
+      : [[1,0,7/16],[-1,1,3/16],[0,1,5/16],[1,1,1/16]];
+    const buf = new Float32Array(d.length);
+    for (let i = 0; i < d.length; i++) buf[i] = d[i];
+    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+      const i = (y*w+x)*4;
+      for (let c = 0; c < 3; c++) {
+        const old = buf[i+c], nv = old > 127 ? 255 : 0;
+        buf[i+c] = nv; d[i+c] = cl(nv);
+        const err = (old - nv) * str;
+        for (const [dx,dy,f] of errDiffuse) {
+          const nx = x+dx, ny = y+dy;
+          if (nx >= 0 && nx < w && ny < h) buf[(ny*w+nx)*4+c] += err * f;
+        }
+      }
+    }
+  }
+}
+
+/* ──── draw functions ──── */
+function drawSquare(w, h, d, cols, rows) {
+  const tmp = document.createElement('canvas');
+  tmp.width = cols; tmp.height = rows;
+  const tc = tmp.getContext('2d');
+  const id = tc.createImageData(cols, rows);
+  id.data.set(d);
+  tc.putImageData(id, 0, 0);
+  ctx.imageSmoothingEnabled = false;
+  ctx.drawImage(tmp, 0, 0, cols, rows, 0, 0, w, h);
+}
+
+function drawShapes(w, h, d, cols, rows) {
+  const { cellSize: cs, style, dotRatio, lumSize, bgColor } = S;
+  fillBg(w, h, bgColor);
+  for (let row = 0; row < rows; row++) {
+    for (let col = 0; col < cols; col++) {
+      const i = (row*cols+col)*4;
+      const r=d[i], g=d[i+1], b=d[i+2], a=d[i+3];
+      if (a === 0) continue;
+      const cx=col*cs+cs/2, cy=row*cs+cs/2, half=cs/2;
+      let ratio = dotRatio;
+      if (lumSize) ratio *= (r*0.299+g*0.587+b*0.114)/255;
+      ctx.fillStyle = `rgba(${r},${g},${b},${a/255})`;
+      if (style === 'dot' || style === 'halftone') {
+        ctx.beginPath(); ctx.arc(cx,cy,half*ratio,0,Math.PI*2); ctx.fill();
+      } else if (style === 'diamond') {
+        const s=half*ratio;
+        ctx.beginPath(); ctx.moveTo(cx,cy-s); ctx.lineTo(cx+s,cy); ctx.lineTo(cx,cy+s); ctx.lineTo(cx-s,cy); ctx.closePath(); ctx.fill();
+      } else if (style === 'cross') {
+        const arm=half*ratio, thick=Math.max(1,cs*0.22);
+        ctx.fillRect(cx-arm,cy-thick/2,arm*2,thick);
+        ctx.fillRect(cx-thick/2,cy-arm,thick,arm*2);
+      } else if (style === 'line') {
+        const lum=(r*0.299+g*0.587+b*0.114)/255;
+        const thick=Math.max(0.5,cs*dotRatio*lum);
+        ctx.fillRect(col*cs,cy-thick/2,cs,thick);
+      }
+    }
+  }
+}
+
+function drawEngrave(w, h, src) {
+  const cs = S.cellSize;
+  const ratio = S.dotRatio;
+
+  const cols = Math.max(1, Math.ceil(w / cs));
+  const rows = Math.max(1, Math.ceil(h / cs));
+
+  // Sample image
+  const tmp = document.createElement('canvas');
+  tmp.width = cols; tmp.height = rows;
+  const tc = tmp.getContext('2d', { willReadFrequently: true });
+  tc.drawImage(src, 0, 0, cols, rows);
+  const imgData = tc.getImageData(0, 0, cols, rows);
+  const dd = imgData.data;
+
+  // Apply brightness/contrast/invert/quantize/colorMode
+  if (S.bright !== 0 || S.contrast !== 0) {
+    const b = S.bright * 2.55, cf = (S.contrast + 100) / 100, ic = 128 * (1 - cf);
+    for (let i = 0; i < dd.length; i += 4) {
+      dd[i] = cl(dd[i]*cf+ic+b); dd[i+1] = cl(dd[i+1]*cf+ic+b); dd[i+2] = cl(dd[i+2]*cf+ic+b);
+    }
+  }
+  if (S.invert) { for (let i = 0; i < dd.length; i += 4) { dd[i]=255-dd[i]; dd[i+1]=255-dd[i+1]; dd[i+2]=255-dd[i+2]; } }
+
+  // Compute luminance
+  const lum = new Float32Array(cols * rows);
+  for (let i = 0; i < lum.length; i++) {
+    lum[i] = (dd[i*4] * 0.299 + dd[i*4+1] * 0.587 + dd[i*4+2] * 0.114) / 255;
+  }
+
+  // Get ink/paper colors based on color mode
+  let inkR, inkG, inkB, paperR, paperG, paperB;
+  const cm = S.colorMode;
+  if (cm === 'amber') {
+    inkR = 60; inkG = 40; inkB = 10;
+    paperR = 230; paperG = 210; paperB = 160;
+  } else if (cm === 'matrix') {
+    inkR = 0; inkG = 60; inkB = 10;
+    paperR = 10; paperG = 30; paperB = 10;
+  } else if (cm === 'cyan') {
+    inkR = 0; inkG = 40; inkB = 60;
+    paperR = 180; paperG = 220; paperB = 230;
+  } else if (cm === 'gray') {
+    inkR = inkG = inkB = 30;
+    paperR = paperG = paperB = 230;
+  } else if (cm === 'custom') {
+    const fg = hexRgb(S.fgColor);
+    const bg = hexRgb(S.bgColorCustom);
+    inkR = fg[0]; inkG = fg[1]; inkB = fg[2];
+    paperR = bg[0]; paperG = bg[1]; paperB = bg[2];
+  } else {
+    // full color mode: dark ink on light paper
+    inkR = inkG = inkB = 30;
+    paperR = paperG = paperB = 235;
+  }
+
+  // Fill paper background
+  ctx.fillStyle = `rgb(${paperR},${paperG},${paperB})`;
+  ctx.fillRect(0, 0, w, h);
+
+  // Draw cross-shaped halftone grid
+  const inkStyle = `rgb(${inkR},${inkG},${inkB})`;
+
+  for (let row = 0; row < rows; row++) {
+    for (let col = 0; col < cols; col++) {
+      const idx = row * cols + col;
+      const l = lum[idx];
+
+      const darkness = 1 - l;
+      if (darkness < 0.03) continue;
+
+      const cx = col * cs + cs / 2;
+      const cy = row * cs + cs / 2;
+
+      // Cross arm length and thickness scale with darkness
+      const arm = cs * 0.5 * ratio * darkness;
+      const thick = Math.max(0.8, cs * 0.15 * (0.3 + darkness * 0.9));
+
+      // In full color mode, tint the ink with the pixel color
+      if (cm === 'full') {
+        const pi = idx * 4;
+        const pr = dd[pi], pg = dd[pi+1], pb = dd[pi+2];
+        const mix = 0.5;
+        const mr = cl(pr * mix + inkR * (1-mix));
+        const mg = cl(pg * mix + inkG * (1-mix));
+        const mb = cl(pb * mix + inkB * (1-mix));
+        ctx.fillStyle = `rgb(${mr},${mg},${mb})`;
+      } else {
+        ctx.fillStyle = inkStyle;
+      }
+
+      // Horizontal bar
+      ctx.fillRect(cx - arm, cy - thick / 2, arm * 2, thick);
+      // Vertical bar
+      ctx.fillRect(cx - thick / 2, cy - arm, thick, arm * 2);
+    }
+  }
+}
+
+function drawTextMode(w, h, d, cols, rows) {
+  const { style, cellSize: cs, charset, fontSize, fontFamily } = S;
+  if (style === 'ascii') {
+    const charW=fontSize*0.6, charH=fontSize*1.15;
+    const tCols=Math.floor(w/charW), tRows=Math.floor(h/charH);
+    const resampled = resamplePixels(d, cols, rows, tCols, tRows);
+    fillBg(w, h, getBgForMode());
+    ctx.font = `${fontSize}px ${fontFamily}`; ctx.textBaseline = 'top';
+    for (let row=0; row<tRows; row++) for (let col=0; col<tCols; col++) {
+      const i=(row*tCols+col)*4;
+      const r=resampled[i], g=resampled[i+1], b=resampled[i+2];
+      const lum=(r*0.299+g*0.587+b*0.114)/255;
+      const ci=Math.min(charset.length-1,Math.floor(lum*charset.length));
+      if (charset[ci] === ' ') continue;
+      ctx.fillStyle = `rgb(${r},${g},${b})`;
+      ctx.fillText(charset[ci], col*charW, row*charH);
+    }
+  } else {
+    const dotW=cs, dotH=cs*2;
+    const bCols=Math.floor(w/dotW), bRows=Math.floor(h/dotH);
+    const srcCols=bCols*2, srcRows=bRows*4;
+    const hr = resamplePixels(d, cols, rows, srcCols, srcRows);
+    fillBg(w, h, getBgForMode());
+    ctx.font = `${Math.round(dotH*1.05)}px monospace`; ctx.textBaseline = 'top';
+    for (let by=0; by<bRows; by++) for (let bx=0; bx<bCols; bx++) {
+      let code=0x2800, rr=0, gg=0, bb=0, cnt=0;
+      const offsets=[[0,0,0x01],[0,1,0x02],[0,2,0x04],[1,0,0x08],[1,1,0x10],[1,2,0x20],[0,3,0x40],[1,3,0x80]];
+      for (const [dx,dy,bit] of offsets) {
+        const sx=bx*2+dx, sy=by*4+dy;
+        if (sx<srcCols && sy<srcRows) {
+          const pi=(sy*srcCols+sx)*4;
+          const lum=(hr[pi]*0.299+hr[pi+1]*0.587+hr[pi+2]*0.114)/255;
+          if (lum > 0.4) { code|=bit; rr+=hr[pi]; gg+=hr[pi+1]; bb+=hr[pi+2]; cnt++; }
+        }
+      }
+      if (code === 0x2800) continue;
+      if (cnt>0) { rr=Math.round(rr/cnt); gg=Math.round(gg/cnt); bb=Math.round(bb/cnt); }
+      ctx.fillStyle = `rgb(${rr},${gg},${bb})`;
+      ctx.fillText(String.fromCharCode(code), bx*dotW, by*dotH);
+    }
+  }
+}
+
+function resamplePixels(srcD, srcW, srcH, dstW, dstH) {
+  const out = new Uint8ClampedArray(dstW*dstH*4);
+  for (let y=0; y<dstH; y++) for (let x=0; x<dstW; x++) {
+    const sx=Math.min(srcW-1,Math.floor(x*srcW/dstW));
+    const sy=Math.min(srcH-1,Math.floor(y*srcH/dstH));
+    const si=(sy*srcW+sx)*4, di=(y*dstW+x)*4;
+    out[di]=srcD[si]; out[di+1]=srcD[si+1]; out[di+2]=srcD[si+2]; out[di+3]=srcD[si+3];
+  }
+  return out;
+}
+
+function getBgForMode() {
+  if (S.colorMode === 'custom') return S.bgColorCustom;
+  if (S.colorMode === 'matrix') return '#0a0f0a';
+  if (S.colorMode === 'amber') return '#0f0a00';
+  if (S.colorMode === 'cyan') return '#000a0f';
+  return S.bgColor;
+}
+
+/* ──── FX ──── */
+function fillBg(w, h, c) {
+  if (c === 'transparent') ctx.clearRect(0,0,w,h);
+  else { ctx.fillStyle = c; ctx.fillRect(0,0,w,h); }
+}
+function drawGrid(w, h, cs) {
+  ctx.strokeStyle = `rgba(0,0,0,${S.gridAlpha})`; ctx.lineWidth = 1; ctx.beginPath();
+  for (let x=0; x<=w; x+=cs) { ctx.moveTo(x+.5,0); ctx.lineTo(x+.5,h); }
+  for (let y=0; y<=h; y+=cs) { ctx.moveTo(0,y+.5); ctx.lineTo(w,y+.5); }
+  ctx.stroke();
+}
+function drawVignette(w, h) {
+  const g=ctx.createRadialGradient(w/2,h/2,Math.min(w,h)*0.2,w/2,h/2,Math.max(w,h)*0.7);
+  g.addColorStop(0,'transparent'); g.addColorStop(1,`rgba(0,0,0,${S.vignette})`);
+  ctx.fillStyle=g; ctx.fillRect(0,0,w,h);
+}
+function drawCRT(w, h) {
+  ctx.fillStyle='rgba(0,0,0,0.12)';
+  for (let y=0; y<h; y+=3) ctx.fillRect(0,y,w,1);
+}
+
+/* ──── helpers ──── */
+function cl(v) { return v<0?0:v>255?255:v|0; }
+function hexRgb(hex) { const n=parseInt(hex.slice(1),16); return [(n>>16)&255,(n>>8)&255,n&255]; }
+
+const STYLE_LABELS = {square:'方块',dot:'圆点',diamond:'菱形',cross:'十字',halftone:'半色调',line:'线条',engrave:'蚀刻',ascii:'ASCII',braille:'Braille'};
+const CM_LABELS = {full:'原色',gray:'灰度',matrix:'Matrix',amber:'琥珀',cyan:'青蓝',custom:'自定义'};
+function updateInfo(w, h) {
+  const cs = S.style === 'ascii' ? `${S.fontSize}px` : `${S.cellSize}px`;
+  let html =
+    `<span>${w}×${h}</span><span>单元 ${cs}</span>` +
+    `<span>${STYLE_LABELS[S.style]}</span><span>${CM_LABELS[S.colorMode]}</span>`;
+  if (S.dither !== 'none') html += `<span>抖动 ${S.dither}</span>`;
+  if (S.crt) html += '<span>CRT</span>';
+  if (S.sourceType === 'video') html += '<span>视频</span>';
+  if (S.particleMode) html += `<span>粒子 ${particles.length}</span>`;
+  $('#infoBar').innerHTML = html;
+}
+
+/* ════════════════════════════════════════
+   Particle Animation System
+   ════════════════════════════════════════ */
+let particles = [];
+let particleAnimId = null;
+let pTime = 0;
+
+function initParticles() {
+  const src = getSource();
+  if (!src) return;
+  const w = srcW(), h = srcH();
+  const cs = S.cellSize;
+  const cols = Math.max(1, Math.ceil(w / cs));
+  const rows = Math.max(1, Math.ceil(h / cs));
+  const d = sampleAndProcess(cols, rows, src, w, h);
+
+  canvas.width = w; canvas.height = h;
+  particles = [];
+
+  for (let row = 0; row < rows; row++) {
+    for (let col = 0; col < cols; col++) {
+      const i = (row * cols + col) * 4;
+      const r = d[i], g = d[i+1], b = d[i+2], a = d[i+3];
+      if (a < 10) continue;
+      const hx = col * cs + cs / 2;
+      const hy = row * cs + cs / 2;
+      particles.push({
+        homeX: hx, homeY: hy,
+        x: hx, y: hy,
+        vx: 0, vy: 0,
+        r, g, b, a,
+        phase: Math.random() * Math.PI * 2
+      });
+    }
+  }
+}
+
+function startParticleAnim() {
+  initParticles();
+  pTime = 0;
+  if (particleAnimId) cancelAnimationFrame(particleAnimId);
+  particleAnim();
+}
+
+function stopParticleAnim() {
+  if (particleAnimId) { cancelAnimationFrame(particleAnimId); particleAnimId = null; }
+  render();
+}
+
+function particleAnim() {
+  if (!S.particleMode) return;
+  particleAnimId = requestAnimationFrame(() => {
+    pTime += S.pSpeed * 0.02;
+    updateParticles();
+    drawParticles();
+    updateInfo(canvas.width, canvas.height);
+    particleAnim();
+  });
+}
+
+function updateParticles() {
+  const { pAmp, pSpring, pDamp, particlePattern, mouseMode, mouseStr, mouseRad } = S;
+  const mx = S.mouseX, my = S.mouseY;
+  const w = canvas.width, h = canvas.height;
+  const cx = w / 2, cy = h / 2;
+
+  for (const p of particles) {
+    let ox = 0, oy = 0;
+
+    if (particlePattern === 'wave') {
+      oy = Math.sin(p.homeX * 0.02 + pTime) * pAmp;
+      ox = Math.cos(p.homeY * 0.025 + pTime * 0.7) * pAmp * 0.4;
+    } else if (particlePattern === 'breathe') {
+      const dx = p.homeX - cx, dy = p.homeY - cy;
+      const dist = Math.sqrt(dx * dx + dy * dy) || 1;
+      const scale = Math.sin(pTime + dist * 0.005) * pAmp / dist * 8;
+      ox = dx * scale;
+      oy = dy * scale;
+    } else if (particlePattern === 'spiral') {
+      const dx = p.homeX - cx, dy = p.homeY - cy;
+      const dist = Math.sqrt(dx * dx + dy * dy) || 1;
+      const angle = pTime * 0.5 + dist * 0.003;
+      ox = Math.cos(angle) * pAmp * 0.5 - Math.sin(angle) * pAmp * 0.2;
+      oy = Math.sin(angle) * pAmp * 0.5 + Math.cos(angle) * pAmp * 0.2;
+    } else if (particlePattern === 'float') {
+      ox = Math.sin(pTime * 0.8 + p.phase) * pAmp * 0.6;
+      oy = Math.cos(pTime * 0.6 + p.phase * 1.3) * pAmp;
+    } else if (particlePattern === 'pulse') {
+      const dx = p.homeX - cx, dy = p.homeY - cy;
+      const dist = Math.sqrt(dx * dx + dy * dy) || 1;
+      const wave = Math.sin(pTime * 2 - dist * 0.015) * pAmp;
+      ox = (dx / dist) * wave;
+      oy = (dy / dist) * wave;
+    }
+
+    let tx = p.homeX + ox, ty = p.homeY + oy;
+
+    if (mouseMode !== 'none' && mx > -999) {
+      const mdx = p.x - mx, mdy = p.y - my;
+      const mDist = Math.sqrt(mdx * mdx + mdy * mdy);
+      if (mDist < mouseRad && mDist > 0.1) {
+        const force = (1 - mDist / mouseRad) * mouseStr * 0.1;
+        if (mouseMode === 'push') {
+          p.vx += (mdx / mDist) * force;
+          p.vy += (mdy / mDist) * force;
+        } else {
+          p.vx -= (mdx / mDist) * force;
+          p.vy -= (mdy / mDist) * force;
+        }
+      }
+    }
+
+    p.vx += (tx - p.x) * pSpring;
+    p.vy += (ty - p.y) * pSpring;
+    p.vx *= pDamp;
+    p.vy *= pDamp;
+    p.x += p.vx;
+    p.y += p.vy;
+  }
+}
+
+function drawParticles() {
+  const w = canvas.width, h = canvas.height;
+  const cs = S.cellSize;
+  const half = cs / 2;
+  const style = S.style;
+  const ratio = S.dotRatio;
+
+  fillBg(w, h, getBgForMode());
+
+  for (const p of particles) {
+    const { x, y, r, g, b, a } = p;
+    ctx.fillStyle = `rgba(${r},${g},${b},${a/255})`;
+
+    if (style === 'dot' || style === 'halftone') {
+      ctx.beginPath(); ctx.arc(x, y, half * ratio, 0, Math.PI * 2); ctx.fill();
+    } else if (style === 'diamond') {
+      const s = half * ratio;
+      ctx.beginPath(); ctx.moveTo(x,y-s); ctx.lineTo(x+s,y); ctx.lineTo(x,y+s); ctx.lineTo(x-s,y); ctx.closePath(); ctx.fill();
+    } else if (style === 'cross') {
+      const arm = half * ratio, thick = Math.max(1, cs * 0.22);
+      ctx.fillRect(x-arm, y-thick/2, arm*2, thick);
+      ctx.fillRect(x-thick/2, y-arm, thick, arm*2);
+    } else if (style === 'ascii' || style === 'braille') {
+      const lum = (r*0.299+g*0.587+b*0.114)/255;
+      const chars = S.charset;
+      const ci = Math.min(chars.length-1, Math.floor(lum * chars.length));
+      if (chars[ci] !== ' ') {
+        ctx.font = `${S.fontSize}px ${S.fontFamily}`;
+        ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        ctx.fillText(chars[ci], x, y);
+      }
+    } else if (style === 'line' || style === 'engrave') {
+      const lum = (r*0.299+g*0.587+b*0.114)/255;
+      const thick = Math.max(0.5, cs * ratio * lum);
+      ctx.fillRect(x-half, y-thick/2, cs, thick);
+    } else {
+      ctx.fillRect(x - half, y - half, cs, cs);
+    }
+  }
+
+  if (S.showGrid && cs >= 3) drawGrid(w, h, cs);
+  if (S.vignette > 0) drawVignette(w, h);
+  if (S.crt) drawCRT(w, h);
+
+  // mouse indicator
+  if (S.mouseMode !== 'none' && S.mouseX > -999) {
+    ctx.strokeStyle = S.mouseMode === 'push' ? 'rgba(255,106,176,.25)' : 'rgba(124,106,255,.25)';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.arc(S.mouseX, S.mouseY, S.mouseRad, 0, Math.PI * 2); ctx.stroke();
+  }
+}
+</script>
+</body>
+</html>

@@ -5,5 +5,4 @@ agent-tools/
 terminals/
 *.pen
 src/
-pixel-tool.html
 package*.json
