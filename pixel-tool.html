@@ -84,6 +84,13 @@
   .chip:hover { border-color: var(--accent); color: var(--text); }
   .chip.active { border-color: var(--accent); background: rgba(124,106,255,.15); color: var(--accent); }
 
+  .pal-preview { display: flex; gap: 3px; margin-top: 6px; flex-wrap: wrap; }
+  .pal-swatch {
+    width: 22px; height: 22px; border-radius: 4px; border: 1px solid rgba(255,255,255,.15);
+    transition: transform .12s;
+  }
+  .pal-swatch:hover { transform: scale(1.2); }
+
   .toggle-row {
     display: flex; align-items: center; justify-content: space-between;
     font-size: 12px; color: var(--text2);
@@ -212,10 +219,81 @@
   }
   @keyframes shimmer { to { transform: translateX(100%); } }
 
+  /* ──── tool switcher ──── */
+  .tool-tabs { display: flex; gap: 6px; padding: 0 0 4px; }
+  .tool-tab {
+    padding: 8px 20px; border-radius: 8px; border: 1px solid var(--border);
+    background: var(--surface); color: var(--text2); font-size: 13px; font-weight: 500;
+    cursor: pointer; transition: all .15s;
+  }
+  .tool-tab:hover { border-color: var(--accent); color: var(--text); }
+  .tool-tab.active { border-color: var(--accent); background: rgba(124,106,255,.12); color: var(--accent); }
+
+  .tool-section { display: none; }
+  .tool-section.active { display: flex; flex-direction: column; gap: 16px; }
+
+  /* ──── Icon Grid Abstractor ──── */
+  .iga-body { display: none; gap: 20px; }
+  .iga-body.active { display: flex; }
+
+  .iga-sidebar {
+    flex: 0 0 240px; display: flex; flex-direction: column; gap: 14px;
+  }
+  .iga-main { flex: 1; display: flex; flex-direction: column; gap: 16px; }
+
+  .iga-preview-box {
+    border-radius: var(--radius);
+    border: 1px solid var(--border); background: var(--surface); padding: 12px;
+    display: flex; flex-direction: column; gap: 8px;
+  }
+  .iga-preview-box .title { font-size: 12px; color: var(--text2); font-weight: 500; }
+
+  .iga-grid {
+    display: grid; gap: 1px; background: var(--border); border-radius: 8px; overflow: hidden;
+    aspect-ratio: 1; width: 100%; max-width: 560px;
+    user-select: none; -webkit-user-select: none;
+  }
+  .iga-cell {
+    background: var(--surface); transition: background .06s;
+    aspect-ratio: 1; position: relative;
+  }
+  .iga-cell.on { background: #fff; }
+  .iga-cell:hover::after {
+    content: ''; position: absolute; inset: 0;
+    border: 2px solid var(--accent); pointer-events: none; z-index: 1;
+  }
+  .iga-grid.tool-pen { cursor: crosshair; }
+  .iga-grid.tool-eraser { cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16'%3E%3Crect x='2' y='2' width='12' height='12' fill='none' stroke='%23fff' stroke-width='1.5' rx='2'/%3E%3C/svg%3E") 8 8, crosshair; }
+  .iga-grid.tool-picker { cursor: crosshair; }
+
+  .iga-svg-preview {
+    border: 1px solid var(--border); border-radius: var(--radius);
+    background: var(--surface); padding: 16px; min-height: 160px;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .iga-svg-preview svg { max-width: 100%; max-height: 280px; }
+  .iga-svg-title { font-size: 13px; color: var(--text2); font-weight: 600; margin-bottom: 6px; }
+
+  .iga-hint { font-size: 11px; color: var(--text2); opacity: .7; margin-top: 4px; }
+
+  .iga-palette-row {
+    display: flex; gap: 4px; flex-wrap: wrap; margin-top: 6px;
+  }
+  .iga-palette-swatch {
+    width: 24px; height: 24px; border-radius: 4px; cursor: pointer;
+    border: 2px solid transparent; transition: border-color .12s, transform .12s;
+  }
+  .iga-palette-swatch:hover { transform: scale(1.15); }
+  .iga-palette-swatch.active { border-color: var(--accent); }
+
+  .iga-import-row { display: flex; gap: 8px; margin-bottom: 6px; }
+
   @media (max-width: 800px) {
     .workspace.active { flex-direction: column; }
     .sidebar { flex: none; position: static; height: auto; flex-direction: row; flex-wrap: wrap; overflow: visible; }
     .sidebar .panel { flex: 1; min-width: 240px; }
+    .iga-body.active { flex-direction: column; }
+    .iga-sidebar { flex: none; }
   }
 </style>
 </head>
@@ -227,6 +305,13 @@
 </header>
 
 <div class="app">
+  <div class="tool-tabs">
+    <button class="tool-tab active" data-tool="stylizer">像素风格化</button>
+    <button class="tool-tab" data-tool="icongrid">像素 Icon</button>
+  </div>
+
+  <!-- ============ Tool 1: Pixel Stylizer ============ -->
+  <div class="tool-section active" id="toolStylizer">
   <div class="upload-zone" id="uploadZone">
     <svg width="44" height="44" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
       <path d="M12 16V4m0 0L8 8m4-4l4 4M4 17v2a1 1 0 001 1h14a1 1 0 001-1v-2"/>
@@ -249,6 +334,7 @@
           <button class="chip" data-style="halftone">半色调</button>
           <button class="chip" data-style="line">线条</button>
           <button class="chip" data-style="engrave">蚀刻</button>
+          <button class="chip" data-style="ditherart">Dither</button>
           <button class="chip" data-style="ascii">ASCII</button>
           <button class="chip" data-style="braille">Braille</button>
         </div>
@@ -280,6 +366,54 @@
             <button class="chip" data-font="'Courier New'">Courier</button>
             <button class="chip" data-font="Helvetica,sans-serif">Helvetica</button>
           </div>
+        </div>
+      </div>
+
+      <div class="panel" id="ditherArtPanel" style="display:none">
+        <div class="panel-title">Dither 设置</div>
+        <div class="ctrl">
+          <div class="ctrl-label">抖动图案</div>
+          <div class="chip-group" id="daPatternGroup">
+            <button class="chip active" data-dap="bayer4">Bayer 4×4</button>
+            <button class="chip" data-dap="bayer2">Bayer 2×2</button>
+            <button class="chip" data-dap="bayer8">Bayer 8×8</button>
+            <button class="chip" data-dap="halftone">半色调</button>
+            <button class="chip" data-dap="lines">线条</button>
+            <button class="chip" data-dap="crosses">十字</button>
+            <button class="chip" data-dap="dots">圆点</button>
+            <button class="chip" data-dap="grid">网格</button>
+            <button class="chip" data-dap="scales">鳞片</button>
+          </div>
+        </div>
+        <div class="ctrl">
+          <div class="ctrl-label">绘制形状</div>
+          <div class="chip-group" id="daShapeGroup">
+            <button class="chip active" data-das="square">方块</button>
+            <button class="chip" data-das="circle">圆形</button>
+            <button class="chip" data-das="diamond">菱形</button>
+          </div>
+        </div>
+        <div class="ctrl">
+          <div class="ctrl-label">抖动风格</div>
+          <div class="chip-group" id="daModeGroup">
+            <button class="chip active" data-dam="threshold">阈值</button>
+            <button class="chip" data-dam="scaled">缩放</button>
+          </div>
+        </div>
+        <div class="ctrl">
+          <div class="ctrl-label">调色板</div>
+          <div class="chip-group" id="daPalGroup">
+            <button class="chip active" data-dapal="bw">B&W</button>
+            <button class="chip" data-dapal="gameboy">Game Boy</button>
+            <button class="chip" data-dapal="cga">CGA</button>
+            <button class="chip" data-dapal="sepia">复古</button>
+            <button class="chip" data-dapal="ocean">海洋</button>
+            <button class="chip" data-dapal="sunset">日落</button>
+            <button class="chip" data-dapal="neon">霓虹</button>
+            <button class="chip" data-dapal="earth">大地</button>
+            <button class="chip" data-dapal="pastel">粉彩</button>
+          </div>
+          <div id="daPalPreview" class="pal-preview"></div>
         </div>
       </div>
 
@@ -347,11 +481,28 @@
           <button class="chip active" data-dither="none">无</button>
           <button class="chip" data-dither="floyd">Floyd-Steinberg</button>
           <button class="chip" data-dither="bayer">Bayer 有序</button>
+          <button class="chip" data-dither="bayer8">Bayer 8×8</button>
           <button class="chip" data-dither="atkinson">Atkinson</button>
         </div>
         <div class="ctrl" id="ditherStrCtrl" style="display:none">
           <div class="ctrl-label">抖动强度 <span class="v" id="ditherStrVal">0.8</span></div>
           <input type="range" id="ditherStr" min="10" max="100" value="80">
+        </div>
+        <div class="ctrl" id="paletteCtrl" style="display:none">
+          <div class="ctrl-label">调色板</div>
+          <div class="chip-group" id="paletteGroup">
+            <button class="chip active" data-pal="off">关闭</button>
+            <button class="chip" data-pal="bw">B&W</button>
+            <button class="chip" data-pal="gameboy">Game Boy</button>
+            <button class="chip" data-pal="cga">CGA</button>
+            <button class="chip" data-pal="sepia">复古</button>
+            <button class="chip" data-pal="ocean">海洋</button>
+            <button class="chip" data-pal="sunset">日落</button>
+            <button class="chip" data-pal="neon">霓虹</button>
+            <button class="chip" data-pal="earth">大地</button>
+            <button class="chip" data-pal="pastel">粉彩</button>
+          </div>
+          <div id="palPreview" class="pal-preview"></div>
         </div>
       </div>
 
@@ -486,7 +637,87 @@
       <div class="info-bar" id="infoBar"></div>
     </div>
   </div>
-</div>
+  </div><!-- /toolStylizer -->
+
+  <!-- ============ Tool 2: Pixel Icon Editor ============ -->
+  <div class="tool-section" id="toolIconGrid">
+    <div class="iga-body active" id="igaBody">
+      <div class="iga-sidebar">
+        <div class="panel">
+          <div class="panel-title">画布尺寸</div>
+          <div class="chip-group" id="igaSizeGroup">
+            <button class="chip" data-gs="5">5×5</button>
+            <button class="chip" data-gs="6">6×6</button>
+            <button class="chip" data-gs="7">7×7</button>
+            <button class="chip active" data-gs="8">8×8</button>
+            <button class="chip" data-gs="10">10×10</button>
+            <button class="chip" data-gs="12">12×12</button>
+            <button class="chip" data-gs="16">16×16</button>
+            <button class="chip" data-gs="24">24×24</button>
+            <button class="chip" data-gs="32">32×32</button>
+          </div>
+        </div>
+        <div class="panel">
+          <div class="panel-title">绘制工具</div>
+          <div class="chip-group" id="igaToolGroup">
+            <button class="chip active" data-tool="pen">✏️ 画笔</button>
+            <button class="chip" data-tool="eraser">🧹 橡皮</button>
+            <button class="chip" data-tool="picker">💧 吸管</button>
+          </div>
+        </div>
+        <div class="panel">
+          <div class="panel-title">颜色</div>
+          <div class="ctrl">
+            <div class="ctrl-label" style="gap:8px">
+              画笔色 <input type="color" id="igaFg" value="#ffffff">
+              背景色 <input type="color" id="igaBg" value="#000000">
+            </div>
+          </div>
+          <div class="iga-palette-row" id="igaQuickColors"></div>
+        </div>
+        <div class="panel">
+          <div class="panel-title">导入图片（可选）</div>
+          <div class="iga-import-row">
+            <button class="btn" id="igaImportBtn" style="flex:1">选择图片</button>
+            <input type="file" id="igaFileInput" accept="image/*" style="display:none">
+          </div>
+          <div class="ctrl" id="igaThreshCtrl" style="display:none">
+            <div class="ctrl-label">阈值 <span class="v" id="igaThreshVal">128</span></div>
+            <input type="range" id="igaThresh" min="1" max="255" value="128">
+          </div>
+        </div>
+        <div class="panel">
+          <div class="ctrl">
+            <div class="ctrl-label">导出方块尺寸 <span class="v" id="igaBlockVal">32</span>px</div>
+            <input type="range" id="igaBlock" min="4" max="128" value="32">
+          </div>
+        </div>
+        <div class="panel" style="display:flex; gap:8px; flex-wrap:wrap">
+          <button class="btn" id="igaClearBtn" style="flex:1">清空</button>
+          <button class="btn" id="igaFillBtn" style="flex:1">全填充</button>
+          <button class="btn" id="igaInvertBtn" style="flex:1">反转</button>
+        </div>
+        <div class="panel" style="display:flex; gap:8px; flex-wrap:wrap">
+          <button class="btn btn-accent" id="igaExportSvg" style="flex:1">导出 SVG</button>
+          <button class="btn" id="igaExportPng" style="flex:1">导出 PNG</button>
+        </div>
+        <div class="iga-hint">左键绘制，右键擦除，按住拖动连续绘制。</div>
+      </div>
+
+      <div class="iga-main">
+        <div class="iga-preview-box" style="flex:none">
+          <div class="title" id="igaGridTitle">像素画布 (8×8)</div>
+          <div class="iga-grid" id="igaGrid"></div>
+        </div>
+        <div>
+          <div class="iga-svg-title">SVG 预览</div>
+          <div class="iga-svg-preview" id="igaSvgPreview"></div>
+        </div>
+      </div>
+    </div>
+  </div><!-- /toolIconGrid -->
+
+</div><!-- /.app -->
 
 <!-- Loading overlay -->
 <div class="loading-overlay" id="loadingOverlay">
@@ -518,6 +749,11 @@ const S = {
   contrast: 0,
   dither: 'none',
   ditherStr: 0.8,
+  palette: 'off',
+  daPattern: 'bayer4',
+  daShape: 'square',
+  daMode: 'threshold',
+  daPal: 'bw',
   showGrid: false,
   gridAlpha: 0.2,
   vignette: 0,
@@ -799,10 +1035,11 @@ function chipBind(sel, key, cb) {
 /* ──── controls ──── */
 chipBind('#styleGroup .chip', 'style', c => {
   S.style = c.dataset.style;
-  const isShape = !['square','ascii','braille'].includes(S.style);
+  const isShape = !['square','ascii','braille','ditherart'].includes(S.style);
   const isText = ['ascii','braille'].includes(S.style);
   $('#dotRatioCtrl').style.display = (isShape || S.style === 'engrave') ? '' : 'none';
   $('#asciiPanel').style.display = isText ? '' : 'none';
+  $('#ditherArtPanel').style.display = S.style === 'ditherart' ? '' : 'none';
   if (S.particleMode) initParticles();
   render();
 });
@@ -834,10 +1071,52 @@ $('#contrast').addEventListener('input', e => { S.contrast = +e.target.value; $(
 
 chipBind('#ditherGroup .chip', null, c => {
   S.dither = c.dataset.dither;
-  $('#ditherStrCtrl').style.display = S.dither !== 'none' ? '' : 'none';
+  const on = S.dither !== 'none';
+  $('#ditherStrCtrl').style.display = on ? '' : 'none';
+  $('#paletteCtrl').style.display = on ? '' : 'none';
+  if (!on) { S.palette = 'off'; $$('#paletteGroup .chip').forEach(b => b.classList.remove('active')); $$('#paletteGroup .chip')[0].classList.add('active'); updatePalPreview(); }
   render();
 });
 $('#ditherStr').addEventListener('input', e => { S.ditherStr = +e.target.value / 100; $('#ditherStrVal').textContent = S.ditherStr.toFixed(2); render(); });
+
+const PALETTES = {
+  bw:      ['#000000','#ffffff'],
+  gameboy: ['#0f380f','#306230','#8bac0f','#9bbc0f'],
+  cga:     ['#000000','#55ffff','#ff55ff','#ffffff'],
+  sepia:   ['#1a0a00','#5c3a1e','#c8a870','#f0e0c0'],
+  ocean:   ['#05204a','#1a6fb0','#6ec6e6','#e0f4ff'],
+  sunset:  ['#1a0533','#8b1a4a','#f28c28','#fce8a0'],
+  neon:    ['#0d0221','#ff2975','#00f5d4','#f6f740'],
+  earth:   ['#1b1811','#6b4226','#8b9b3e','#d4c09e'],
+  pastel:  ['#2d2b55','#ff7eb3','#7ec8e3','#fff5ba'],
+};
+
+function updatePalPreview() {
+  const el = $('#palPreview');
+  if (S.palette === 'off' || !PALETTES[S.palette]) { el.innerHTML = ''; return; }
+  el.innerHTML = PALETTES[S.palette].map(c => `<span class="pal-swatch" style="background:${c}"></span>`).join('');
+}
+
+chipBind('#paletteGroup .chip', null, c => {
+  S.palette = c.dataset.pal;
+  updatePalPreview();
+  render();
+});
+
+/* ──── dither art controls ──── */
+chipBind('#daPatternGroup .chip', null, c => { S.daPattern = c.dataset.dap; render(); });
+chipBind('#daShapeGroup .chip', null, c => { S.daShape = c.dataset.das; render(); });
+chipBind('#daModeGroup .chip', null, c => { S.daMode = c.dataset.dam; render(); });
+chipBind('#daPalGroup .chip', null, c => {
+  S.daPal = c.dataset.dapal;
+  $('#daPalPreview').innerHTML = PALETTES[S.daPal]
+    ? PALETTES[S.daPal].map(co => `<span class="pal-swatch" style="background:${co}"></span>`).join('')
+    : '';
+  render();
+});
+$('#daPalPreview').innerHTML = PALETTES[S.daPal]
+  ? PALETTES[S.daPal].map(co => `<span class="pal-swatch" style="background:${co}"></span>`).join('')
+  : '';
 
 $('#gridToggle').addEventListener('click', function() { S.showGrid = !S.showGrid; this.classList.toggle('on', S.showGrid); $('#gridAlphaCtrl').style.display = S.showGrid ? '' : 'none'; render(); });
 $('#gridAlpha').addEventListener('input', e => { S.gridAlpha = +e.target.value / 100; $('#gridAlphaVal').textContent = e.target.value + '%'; render(); });
@@ -945,7 +1224,8 @@ $('#resetBtn').addEventListener('click', () => {
   S.particleMode = false;
   Object.assign(S, {
     style:'square', cellSize:8, dotRatio:0.8, blur:0, colorMode:'full',
-    quantize:0, invert:false, bright:0, contrast:0, dither:'none', ditherStr:0.8,
+    quantize:0, invert:false, bright:0, contrast:0, dither:'none', ditherStr:0.8, palette:'off',
+    daPattern:'bayer4', daShape:'square', daMode:'threshold', daPal:'bw',
     showGrid:false, gridAlpha:0.2, vignette:0, crt:false, lumSize:false,
     bgColor:'#000000', charset:' .:-=+*#%@', fontSize:10, fontFamily:'monospace',
     particlePattern:'wave', pSpeed:1.0, pAmp:12, pSpring:0.08, pDamp:0.88,
@@ -955,7 +1235,8 @@ $('#resetBtn').addEventListener('click', () => {
   ['#cellSize','#dotRatio','#blur','#bright','#contrast','#gridAlpha','#vignette','#ditherStr','#fontSize','#pSpeed','#pAmp','#pSpring','#pDamp','#mStr','#mRad'].forEach(s => { try { $(s).value = $(s).defaultValue; } catch(e){} });
   ['#cellVal:8','#dotRatioVal:80%','#blurVal:0','#brightVal:0','#contrastVal:0','#gridAlphaVal:20%','#vignetteVal:0','#ditherStrVal:0.8','#fontSizeVal:10','#pSpeedVal:1.0','#pAmpVal:12','#pSpringVal:0.08','#pDampVal:0.88','#mStrVal:50','#mRadVal:120'].forEach(p => { const [s,v] = p.split(':'); try { $(s).textContent = v; } catch(e){} });
   $$('.chip-group').forEach(g => { const chips = g.querySelectorAll('.chip'); chips.forEach(c => c.classList.remove('active')); if (chips[0]) chips[0].classList.add('active'); });
-  ['#dotRatioCtrl','#asciiPanel','#customCharRow','#customColorCtrl','#gridAlphaCtrl','#ditherStrCtrl','#particleOpts'].forEach(s => $(s).style.display = 'none');
+  ['#dotRatioCtrl','#asciiPanel','#customCharRow','#customColorCtrl','#gridAlphaCtrl','#ditherStrCtrl','#paletteCtrl','#ditherArtPanel','#particleOpts'].forEach(s => $(s).style.display = 'none');
+  updatePalPreview();
   render();
 });
 
@@ -996,6 +1277,7 @@ function drawStylized(w, h, src) {
   if (style === 'ascii' || style === 'braille') drawTextMode(w, h, pixels, cols, rows);
   else if (style === 'square') drawSquare(w, h, pixels, cols, rows);
   else if (style === 'engrave') drawEngrave(w, h, src);
+  else if (style === 'ditherart') drawDitherArt(w, h, src);
   else drawShapes(w, h, pixels, cols, rows);
 
   if (S.showGrid && cs >= 3) drawGrid(w, h, cs);
@@ -1053,14 +1335,60 @@ function applyColorMode(d) {
   }
 }
 
+function parsePalette() {
+  if (S.palette === 'off' || !PALETTES[S.palette]) return null;
+  return PALETTES[S.palette].map(hexRgb);
+}
+
+function nearestPalColor(r, g, b, pal) {
+  let best = 0, bestD = Infinity;
+  for (let i = 0; i < pal.length; i++) {
+    const dr = r - pal[i][0], dg = g - pal[i][1], db = b - pal[i][2];
+    const dist = dr*dr + dg*dg + db*db;
+    if (dist < bestD) { bestD = dist; best = i; }
+  }
+  return best;
+}
+
+const BAYER4 = [[0,8,2,10],[12,4,14,6],[3,11,1,9],[15,7,13,5]];
+const BAYER8 = (function() {
+  const m = new Array(8);
+  for (let i = 0; i < 8; i++) m[i] = new Array(8);
+  const b2 = [[0,2],[3,1]];
+  for (let y = 0; y < 8; y++) for (let x = 0; x < 8; x++) {
+    const i2 = (y>>2), j2 = (x>>2);
+    const i1 = ((y>>1)&1), j1 = ((x>>1)&1);
+    const i0 = (y&1), j0 = (x&1);
+    m[y][x] = 16*b2[i2][j2] + 4*b2[i1][j1] + b2[i0][j0];
+  }
+  return m;
+})();
+
 function applyDither(d, w, h) {
   const str = S.ditherStr;
-  if (S.dither === 'bayer') {
-    const bayer4 = [[0,8,2,10],[12,4,14,6],[3,11,1,9],[15,7,13,5]];
-    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
-      const i = (y*w+x)*4;
-      const threshold = (bayer4[y%4][x%4]/16 - 0.5)*64*str;
-      d[i]=cl(d[i]+threshold); d[i+1]=cl(d[i+1]+threshold); d[i+2]=cl(d[i+2]+threshold);
+  const pal = parsePalette();
+
+  if (S.dither === 'bayer' || S.dither === 'bayer8') {
+    const mat = S.dither === 'bayer8' ? BAYER8 : BAYER4;
+    const sz = S.dither === 'bayer8' ? 8 : 4;
+    const levels = sz * sz;
+
+    if (pal) {
+      for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+        const i = (y*w+x)*4;
+        const threshold = (mat[y%sz][x%sz] / levels - 0.5) * str;
+        const r = cl(d[i] + threshold * 128);
+        const g = cl(d[i+1] + threshold * 128);
+        const b = cl(d[i+2] + threshold * 128);
+        const ci = nearestPalColor(r, g, b, pal);
+        d[i] = pal[ci][0]; d[i+1] = pal[ci][1]; d[i+2] = pal[ci][2];
+      }
+    } else {
+      for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+        const i = (y*w+x)*4;
+        const threshold = (mat[y%sz][x%sz] / levels - 0.5) * 64 * str;
+        d[i]=cl(d[i]+threshold); d[i+1]=cl(d[i+1]+threshold); d[i+2]=cl(d[i+2]+threshold);
+      }
     }
   } else {
     const errDiffuse = S.dither === 'atkinson'
@@ -1068,15 +1396,35 @@ function applyDither(d, w, h) {
       : [[1,0,7/16],[-1,1,3/16],[0,1,5/16],[1,1,1/16]];
     const buf = new Float32Array(d.length);
     for (let i = 0; i < d.length; i++) buf[i] = d[i];
-    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
-      const i = (y*w+x)*4;
-      for (let c = 0; c < 3; c++) {
-        const old = buf[i+c], nv = old > 127 ? 255 : 0;
-        buf[i+c] = nv; d[i+c] = cl(nv);
-        const err = (old - nv) * str;
+
+    if (pal) {
+      for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+        const i = (y*w+x)*4;
+        const r = buf[i], g = buf[i+1], b = buf[i+2];
+        const ci = nearestPalColor(r, g, b, pal);
+        const nr = pal[ci][0], ng = pal[ci][1], nb = pal[ci][2];
+        d[i] = nr; d[i+1] = ng; d[i+2] = nb;
+        buf[i] = nr; buf[i+1] = ng; buf[i+2] = nb;
+        const er = (r - nr) * str, eg = (g - ng) * str, eb = (b - nb) * str;
         for (const [dx,dy,f] of errDiffuse) {
           const nx = x+dx, ny = y+dy;
-          if (nx >= 0 && nx < w && ny < h) buf[(ny*w+nx)*4+c] += err * f;
+          if (nx >= 0 && nx < w && ny < h) {
+            const ni = (ny*w+nx)*4;
+            buf[ni] += er*f; buf[ni+1] += eg*f; buf[ni+2] += eb*f;
+          }
+        }
+      }
+    } else {
+      for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+        const i = (y*w+x)*4;
+        for (let c = 0; c < 3; c++) {
+          const old = buf[i+c], nv = old > 127 ? 255 : 0;
+          buf[i+c] = nv; d[i+c] = cl(nv);
+          const err = (old - nv) * str;
+          for (const [dx,dy,f] of errDiffuse) {
+            const nx = x+dx, ny = y+dy;
+            if (nx >= 0 && nx < w && ny < h) buf[(ny*w+nx)*4+c] += err * f;
+          }
         }
       }
     }
@@ -1224,6 +1572,172 @@ function drawEngrave(w, h, src) {
   }
 }
 
+/* ──── Dither Art patterns ──── */
+const DA_PATTERNS = {
+  bayer2: { size: 2, matrix: [0,2,3,1] },
+  bayer4: { size: 4, matrix: [0,8,2,10,12,4,14,6,3,11,1,9,15,7,13,5] },
+  bayer8: { size: 8, matrix: (function() {
+    const b2 = [0,2,3,1];
+    const m = new Array(64);
+    for (let y = 0; y < 8; y++) for (let x = 0; x < 8; x++) {
+      m[y*8+x] = 16*b2[((y>>2)&1)*2+((x>>2)&1)] + 4*b2[((y>>1)&1)*2+((x>>1)&1)] + b2[(y&1)*2+(x&1)];
+    }
+    return m;
+  })() },
+  halftone: { size: 6, matrix: (function() {
+    const center = [2.5,2.5];
+    const m = new Array(36);
+    const dists = [];
+    for (let y = 0; y < 6; y++) for (let x = 0; x < 6; x++) {
+      dists.push({ i: y*6+x, d: Math.hypot(x - center[0], y - center[1]) });
+    }
+    dists.sort((a,b) => a.d - b.d);
+    dists.forEach((v, rank) => m[v.i] = rank);
+    return m;
+  })() },
+  lines: { size: 4, matrix: (function() {
+    const m = new Array(16);
+    for (let y = 0; y < 4; y++) for (let x = 0; x < 4; x++) m[y*4+x] = y*4+(x%2===0?0:2);
+    const flat = [...new Set(m)].sort((a,b)=>a-b);
+    for (let i = 0; i < 16; i++) m[i] = flat.indexOf(m[i]) * (16/flat.length);
+    return m;
+  })() },
+  crosses: { size: 6, matrix: (function() {
+    const m = new Array(36).fill(35);
+    const cx = 2.5, cy = 2.5;
+    const pts = [];
+    for (let y = 0; y < 6; y++) for (let x = 0; x < 6; x++) {
+      if (x === 2 || x === 3 || y === 2 || y === 3) {
+        pts.push({ i: y*6+x, d: Math.hypot(x-cx, y-cy) });
+      }
+    }
+    pts.sort((a,b) => a.d - b.d);
+    pts.forEach((v,rank) => m[v.i] = rank);
+    return m;
+  })() },
+  dots: { size: 4, matrix: (function() {
+    const cx = 1.5, cy = 1.5;
+    const m = new Array(16);
+    const pts = [];
+    for (let y = 0; y < 4; y++) for (let x = 0; x < 4; x++) {
+      pts.push({ i: y*4+x, d: Math.hypot(x-cx, y-cy) });
+    }
+    pts.sort((a,b) => a.d - b.d);
+    pts.forEach((v,rank) => m[v.i] = rank);
+    return m;
+  })() },
+  grid: { size: 4, matrix: (function() {
+    const m = new Array(16);
+    for (let y = 0; y < 4; y++) for (let x = 0; x < 4; x++) {
+      const edge = Math.min(x, y, 3-x, 3-y);
+      m[y*4+x] = edge * 5;
+    }
+    return m;
+  })() },
+  scales: { size: 6, matrix: (function() {
+    const m = new Array(36);
+    for (let y = 0; y < 6; y++) for (let x = 0; x < 6; x++) {
+      const cx = (y % 2 === 0) ? 3 : 0;
+      const d = Math.hypot((x - cx + 6) % 6 - 3, y - 3);
+      m[y*6+x] = Math.round(d * 5);
+    }
+    const max = Math.max(...m);
+    for (let i = 0; i < 36; i++) m[i] = Math.round(m[i] / max * 35);
+    return m;
+  })() },
+};
+
+function drawDitherArt(w, h, src) {
+  const cs = S.cellSize;
+  const cols = Math.max(1, Math.ceil(w / cs));
+  const rows = Math.max(1, Math.ceil(h / cs));
+
+  const tmp = document.createElement('canvas');
+  tmp.width = cols; tmp.height = rows;
+  const tc = tmp.getContext('2d', { willReadFrequently: true });
+  tc.drawImage(src, 0, 0, cols, rows);
+  const imgData = tc.getImageData(0, 0, cols, rows);
+  const dd = imgData.data;
+
+  if (S.bright !== 0 || S.contrast !== 0) {
+    const b = S.bright * 2.55, cf = (S.contrast + 100) / 100, ic = 128 * (1 - cf);
+    for (let i = 0; i < dd.length; i += 4) {
+      dd[i] = cl(dd[i]*cf+ic+b); dd[i+1] = cl(dd[i+1]*cf+ic+b); dd[i+2] = cl(dd[i+2]*cf+ic+b);
+    }
+  }
+  if (S.invert) for (let i = 0; i < dd.length; i += 4) { dd[i]=255-dd[i]; dd[i+1]=255-dd[i+1]; dd[i+2]=255-dd[i+2]; }
+
+  const pal = PALETTES[S.daPal] ? PALETTES[S.daPal].map(hexRgb) : [[0,0,0],[255,255,255]];
+  const pat = DA_PATTERNS[S.daPattern] || DA_PATTERNS.bayer4;
+  const sz = pat.size;
+  const levels = Math.max(...pat.matrix) + 1;
+  const scaled = S.daMode === 'scaled';
+
+  ctx.fillStyle = `rgb(${pal[0][0]},${pal[0][1]},${pal[0][2]})`;
+  ctx.fillRect(0, 0, w, h);
+
+  for (let row = 0; row < rows; row++) {
+    for (let col = 0; col < cols; col++) {
+      const pi = (row * cols + col) * 4;
+      const r = dd[pi], g = dd[pi+1], b = dd[pi+2];
+      const lum = (r * 0.299 + g * 0.587 + b * 0.114) / 255;
+
+      const cellX = col * cs, cellY = row * cs;
+
+      if (scaled) {
+        const palIdx = Math.min(pal.length - 1, Math.max(0, Math.round(lum * (pal.length - 1))));
+        const pc = pal[palIdx];
+        const fillSize = cs * (0.15 + lum * 0.85);
+        const offset = (cs - fillSize) / 2;
+
+        ctx.fillStyle = `rgb(${pc[0]},${pc[1]},${pc[2]})`;
+
+        if (S.daShape === 'circle') {
+          ctx.beginPath();
+          ctx.arc(cellX + cs/2, cellY + cs/2, fillSize/2, 0, Math.PI*2);
+          ctx.fill();
+        } else if (S.daShape === 'diamond') {
+          const cx = cellX + cs/2, cy = cellY + cs/2, r = fillSize/2;
+          ctx.beginPath();
+          ctx.moveTo(cx, cy - r); ctx.lineTo(cx + r, cy); ctx.lineTo(cx, cy + r); ctx.lineTo(cx - r, cy);
+          ctx.closePath(); ctx.fill();
+        } else {
+          ctx.fillRect(cellX + offset, cellY + offset, fillSize, fillSize);
+        }
+      } else {
+        const subSize = Math.max(1, Math.floor(cs / sz));
+
+        for (let sy = 0; sy < sz; sy++) {
+          for (let sx = 0; sx < sz; sx++) {
+            const threshold = pat.matrix[sy * sz + sx] / levels;
+            const norm = lum + (threshold - 0.5) * S.ditherStr;
+            const palIdx = Math.min(pal.length - 1, Math.max(0, Math.round(norm * (pal.length - 1))));
+            const pc = pal[palIdx];
+
+            const px = cellX + sx * subSize;
+            const py = cellY + sy * subSize;
+
+            ctx.fillStyle = `rgb(${pc[0]},${pc[1]},${pc[2]})`;
+
+            if (S.daShape === 'circle') {
+              ctx.beginPath();
+              ctx.arc(px + subSize/2, py + subSize/2, subSize/2, 0, Math.PI*2);
+              ctx.fill();
+            } else if (S.daShape === 'diamond') {
+              const cx = px + subSize/2, cy = py + subSize/2, r = subSize/2;
+              ctx.beginPath();
+              ctx.moveTo(cx, cy-r); ctx.lineTo(cx+r, cy); ctx.lineTo(cx, cy+r); ctx.lineTo(cx-r, cy);
+              ctx.closePath(); ctx.fill();
+            } else {
+              ctx.fillRect(px, py, subSize, subSize);
+            }
+          }
+        }
+      }
+    }
+  }
+}
+
 function drawTextMode(w, h, d, cols, rows) {
   const { style, cellSize: cs, charset, fontSize, fontFamily } = S;
   if (style === 'ascii') {
@@ -1311,7 +1825,7 @@ function drawCRT(w, h) {
 function cl(v) { return v<0?0:v>255?255:v|0; }
 function hexRgb(hex) { const n=parseInt(hex.slice(1),16); return [(n>>16)&255,(n>>8)&255,n&255]; }
 
-const STYLE_LABELS = {square:'方块',dot:'圆点',diamond:'菱形',cross:'十字',halftone:'半色调',line:'线条',engrave:'蚀刻',ascii:'ASCII',braille:'Braille'};
+const STYLE_LABELS = {square:'方块',dot:'圆点',diamond:'菱形',cross:'十字',halftone:'半色调',line:'线条',engrave:'蚀刻',ditherart:'Dither',ascii:'ASCII',braille:'Braille'};
 const CM_LABELS = {full:'原色',gray:'灰度',matrix:'Matrix',amber:'琥珀',cyan:'青蓝',custom:'自定义'};
 function updateInfo(w, h) {
   const cs = S.style === 'ascii' ? `${S.fontSize}px` : `${S.cellSize}px`;
@@ -1319,6 +1833,8 @@ function updateInfo(w, h) {
     `<span>${w}×${h}</span><span>单元 ${cs}</span>` +
     `<span>${STYLE_LABELS[S.style]}</span><span>${CM_LABELS[S.colorMode]}</span>`;
   if (S.dither !== 'none') html += `<span>抖动 ${S.dither}</span>`;
+  if (S.palette !== 'off') html += `<span>调色板 ${S.palette}</span>`;
+  if (S.style === 'ditherart') html += `<span>${S.daPattern} · ${S.daShape} · ${S.daMode} · ${S.daPal}</span>`;
   if (S.crt) html += '<span>CRT</span>';
   if (S.sourceType === 'video') html += '<span>视频</span>';
   if (S.particleMode) html += `<span>粒子 ${particles.length}</span>`;
@@ -1497,6 +2013,318 @@ function drawParticles() {
     ctx.beginPath(); ctx.arc(S.mouseX, S.mouseY, S.mouseRad, 0, Math.PI * 2); ctx.stroke();
   }
 }
+
+/* ════════════════════════════════════════════════════════
+   Tool Tab Switching
+   ════════════════════════════════════════════════════════ */
+$$('.tool-tab').forEach(tab => tab.addEventListener('click', () => {
+  $$('.tool-tab').forEach(t => t.classList.remove('active'));
+  tab.classList.add('active');
+  $$('.tool-section').forEach(s => s.classList.remove('active'));
+  $(`#tool${tab.dataset.tool === 'stylizer' ? 'Stylizer' : 'IconGrid'}`).classList.add('active');
+}));
+
+/* ════════════════════════════════════════════════════════
+   Pixel Icon Editor
+   ════════════════════════════════════════════════════════ */
+const IGA = {
+  gridSize: 8,
+  threshold: 128,
+  blockSize: 32,
+  fg: '#ffffff',
+  bg: '#000000',
+  tool: 'pen',
+  cells: [],
+  drawing: false,
+  drawVal: 1,
+  _lastSvg: '',
+};
+
+const QUICK_COLORS = [
+  '#ffffff','#c0c0c0','#808080','#000000',
+  '#ff0000','#ff8800','#ffff00','#00ff00',
+  '#00ffff','#0088ff','#0000ff','#8800ff',
+  '#ff00ff','#ff88cc','#884400','#228822',
+];
+
+const igaGrid = $('#igaGrid');
+const igaSvgPreview = $('#igaSvgPreview');
+
+function igaInit() {
+  const gs = IGA.gridSize;
+  IGA.cells = new Array(gs * gs).fill(0);
+  igaRenderGrid();
+  igaRenderSvgPreview();
+}
+
+function igaRenderGrid() {
+  const gs = IGA.gridSize;
+  igaGrid.style.gridTemplateColumns = `repeat(${gs}, 1fr)`;
+  igaGrid.className = 'iga-grid tool-' + IGA.tool;
+  igaGrid.innerHTML = '';
+  $('#igaGridTitle').textContent = `像素画布 (${gs}×${gs})`;
+
+  for (let i = 0; i < gs * gs; i++) {
+    const cell = document.createElement('div');
+    cell.className = 'iga-cell';
+    cell.dataset.idx = i;
+    if (IGA.cells[i]) {
+      cell.classList.add('on');
+      cell.style.background = IGA.cells[i] === 1 ? IGA.fg : IGA.cells[i];
+    }
+    igaGrid.appendChild(cell);
+  }
+}
+
+function igaCellApply(cell, i) {
+  if (IGA.tool === 'picker') {
+    if (IGA.cells[i] && IGA.cells[i] !== 0) {
+      IGA.fg = typeof IGA.cells[i] === 'string' ? IGA.cells[i] : IGA.fg;
+      $('#igaFg').value = IGA.fg;
+    }
+    return;
+  }
+  const val = IGA.drawVal;
+  if (val) {
+    IGA.cells[i] = IGA.fg;
+    cell.classList.add('on');
+    cell.style.background = IGA.fg;
+  } else {
+    IGA.cells[i] = 0;
+    cell.classList.remove('on');
+    cell.style.background = '';
+  }
+}
+
+igaGrid.addEventListener('mousedown', e => {
+  const cell = e.target.closest('.iga-cell');
+  if (!cell) return;
+  e.preventDefault();
+  const i = +cell.dataset.idx;
+
+  if (IGA.tool === 'picker') {
+    igaCellApply(cell, i);
+    return;
+  }
+
+  if (e.button === 2 || IGA.tool === 'eraser') {
+    IGA.drawVal = 0;
+  } else {
+    IGA.drawVal = 1;
+  }
+  IGA.drawing = true;
+  igaCellApply(cell, i);
+});
+
+igaGrid.addEventListener('mouseover', e => {
+  if (!IGA.drawing) return;
+  const cell = e.target.closest('.iga-cell');
+  if (!cell) return;
+  igaCellApply(cell, +cell.dataset.idx);
+});
+
+document.addEventListener('mouseup', () => {
+  if (IGA.drawing) {
+    IGA.drawing = false;
+    igaRenderSvgPreview();
+  }
+});
+
+igaGrid.addEventListener('contextmenu', e => e.preventDefault());
+
+igaGrid.addEventListener('touchstart', e => {
+  const t = e.touches[0];
+  const cell = document.elementFromPoint(t.clientX, t.clientY);
+  if (!cell || !cell.classList.contains('iga-cell')) return;
+  e.preventDefault();
+  const i = +cell.dataset.idx;
+  IGA.drawVal = IGA.tool === 'eraser' ? 0 : 1;
+  IGA.drawing = true;
+  igaCellApply(cell, i);
+}, { passive: false });
+
+igaGrid.addEventListener('touchmove', e => {
+  if (!IGA.drawing) return;
+  const t = e.touches[0];
+  const cell = document.elementFromPoint(t.clientX, t.clientY);
+  if (!cell || !cell.classList.contains('iga-cell')) return;
+  e.preventDefault();
+  igaCellApply(cell, +cell.dataset.idx);
+}, { passive: false });
+
+igaGrid.addEventListener('touchend', () => {
+  if (IGA.drawing) { IGA.drawing = false; igaRenderSvgPreview(); }
+});
+
+function igaRenderSvgPreview() {
+  const gs = IGA.gridSize;
+  const bs = IGA.blockSize;
+  const total = gs * bs;
+
+  let rects = '';
+  for (let y = 0; y < gs; y++) {
+    for (let x = 0; x < gs; x++) {
+      const v = IGA.cells[y * gs + x];
+      if (v) {
+        const color = typeof v === 'string' ? v : IGA.fg;
+        rects += `<rect x="${x * bs}" y="${y * bs}" width="${bs}" height="${bs}" fill="${color}"/>`;
+      }
+    }
+  }
+
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${total}" height="${total}" viewBox="0 0 ${total} ${total}">` +
+    `<rect width="${total}" height="${total}" fill="${IGA.bg}"/>` +
+    rects + `</svg>`;
+
+  igaSvgPreview.innerHTML = svg;
+  IGA._lastSvg = svg;
+}
+
+function igaImportImage(img) {
+  const gs = IGA.gridSize;
+  const tmp = document.createElement('canvas');
+  tmp.width = gs; tmp.height = gs;
+  const tc = tmp.getContext('2d', { willReadFrequently: true });
+  tc.drawImage(img, 0, 0, gs, gs);
+  const data = tc.getImageData(0, 0, gs, gs).data;
+
+  for (let i = 0; i < gs * gs; i++) {
+    const pi = i * 4;
+    const a = data[pi + 3];
+    if (a < 30) { IGA.cells[i] = 0; continue; }
+    const lum = data[pi] * 0.299 + data[pi + 1] * 0.587 + data[pi + 2] * 0.114;
+    IGA.cells[i] = lum < IGA.threshold
+      ? `rgb(${data[pi]},${data[pi+1]},${data[pi+2]})`
+      : 0;
+  }
+  igaRenderGrid();
+  igaRenderSvgPreview();
+}
+
+function igaRenderQuickColors() {
+  const el = $('#igaQuickColors');
+  el.innerHTML = QUICK_COLORS.map(c =>
+    `<div class="iga-palette-swatch${c === IGA.fg ? ' active' : ''}" data-c="${c}" style="background:${c}"></div>`
+  ).join('');
+  el.querySelectorAll('.iga-palette-swatch').forEach(sw => {
+    sw.addEventListener('click', () => {
+      IGA.fg = sw.dataset.c;
+      $('#igaFg').value = IGA.fg;
+      el.querySelectorAll('.iga-palette-swatch').forEach(s => s.classList.remove('active'));
+      sw.classList.add('active');
+    });
+  });
+}
+
+$('#igaSizeGroup').querySelectorAll('.chip').forEach(c => c.addEventListener('click', () => {
+  $('#igaSizeGroup').querySelectorAll('.chip').forEach(b => b.classList.remove('active'));
+  c.classList.add('active');
+  const oldGs = IGA.gridSize, oldCells = [...IGA.cells];
+  IGA.gridSize = +c.dataset.gs;
+  const gs = IGA.gridSize;
+  IGA.cells = new Array(gs * gs).fill(0);
+  const minG = Math.min(oldGs, gs);
+  for (let y = 0; y < minG; y++) for (let x = 0; x < minG; x++) {
+    IGA.cells[y * gs + x] = oldCells[y * oldGs + x];
+  }
+  igaRenderGrid();
+  igaRenderSvgPreview();
+}));
+
+$('#igaToolGroup').querySelectorAll('.chip').forEach(c => c.addEventListener('click', () => {
+  $('#igaToolGroup').querySelectorAll('.chip').forEach(b => b.classList.remove('active'));
+  c.classList.add('active');
+  IGA.tool = c.dataset.tool;
+  igaGrid.className = 'iga-grid tool-' + IGA.tool;
+}));
+
+$('#igaImportBtn').addEventListener('click', () => $('#igaFileInput').click());
+$('#igaFileInput').addEventListener('change', e => {
+  const file = e.target.files[0];
+  if (!file) return;
+  const img = new Image();
+  img.onload = () => {
+    $('#igaThreshCtrl').style.display = '';
+    igaImportImage(img);
+    IGA._importedImg = img;
+  };
+  img.src = URL.createObjectURL(file);
+});
+
+$('#igaThresh').addEventListener('input', e => {
+  IGA.threshold = +e.target.value;
+  $('#igaThreshVal').textContent = IGA.threshold;
+  if (IGA._importedImg) igaImportImage(IGA._importedImg);
+});
+
+$('#igaBlock').addEventListener('input', e => {
+  IGA.blockSize = +e.target.value;
+  $('#igaBlockVal').textContent = IGA.blockSize;
+  igaRenderSvgPreview();
+});
+
+$('#igaFg').addEventListener('input', e => {
+  IGA.fg = e.target.value;
+  $('#igaQuickColors').querySelectorAll('.iga-palette-swatch').forEach(s => {
+    s.classList.toggle('active', s.dataset.c === IGA.fg);
+  });
+});
+
+$('#igaBg').addEventListener('input', e => {
+  IGA.bg = e.target.value;
+  igaRenderSvgPreview();
+});
+
+$('#igaClearBtn').addEventListener('click', () => {
+  IGA.cells.fill(0);
+  igaRenderGrid();
+  igaRenderSvgPreview();
+});
+
+$('#igaFillBtn').addEventListener('click', () => {
+  IGA.cells = IGA.cells.map(() => IGA.fg);
+  igaRenderGrid();
+  igaRenderSvgPreview();
+});
+
+$('#igaInvertBtn').addEventListener('click', () => {
+  IGA.cells = IGA.cells.map(v => v ? 0 : IGA.fg);
+  igaRenderGrid();
+  igaRenderSvgPreview();
+});
+
+$('#igaExportSvg').addEventListener('click', () => {
+  if (!IGA._lastSvg) return;
+  const blob = new Blob([IGA._lastSvg], { type: 'image/svg+xml' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `pixel-icon-${IGA.gridSize}x${IGA.gridSize}.svg`;
+  a.click();
+  URL.revokeObjectURL(a.href);
+});
+
+$('#igaExportPng').addEventListener('click', () => {
+  const gs = IGA.gridSize, bs = IGA.blockSize, total = gs * bs;
+  const c = document.createElement('canvas');
+  c.width = total; c.height = total;
+  const cx = c.getContext('2d');
+  cx.fillStyle = IGA.bg;
+  cx.fillRect(0, 0, total, total);
+  for (let y = 0; y < gs; y++) for (let x = 0; x < gs; x++) {
+    const v = IGA.cells[y * gs + x];
+    if (v) {
+      cx.fillStyle = typeof v === 'string' ? v : IGA.fg;
+      cx.fillRect(x * bs, y * bs, bs, bs);
+    }
+  }
+  const a = document.createElement('a');
+  a.href = c.toDataURL('image/png');
+  a.download = `pixel-icon-${gs}x${gs}.png`;
+  a.click();
+});
+
+igaRenderQuickColors();
+igaInit();
 </script>
 </body>
 </html>
